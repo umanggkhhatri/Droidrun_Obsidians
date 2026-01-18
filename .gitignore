@@ -1,0 +1,82 @@
+# Environment variables (contains API keys)
+.env
+.env.local
+.env.*.local
+.env.production
+.env.development
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual environments
+venv/
+ENV/
+env/
+.venv/
+.conda/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+*.sublime-project
+*.sublime-workspace
+
+# OS
+.DS_Store
+.DS_Store?
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# Logs
+*.log
+logs/
+
+# Trajectories (agent execution logs)
+trajectories/
+
+# Temp uploads
+/tmp/
+web_uploads/
+*.tmp
+*.temp
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.nox/
+
+# DroidRun config (contains API keys)
+# Note: ~/.droidrun/config.yaml is outside repo, but if copied here:
+config.yaml
+droidrun_config.yaml
+
+# Secrets
+*.pem
+*.key
+secrets/
+credentials/

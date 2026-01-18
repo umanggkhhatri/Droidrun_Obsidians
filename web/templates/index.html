@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Social Media Automator</title>
+    <link
+      rel="stylesheet"
+      href="{{ url_for('static', filename='style.css') }}"
+    />
+  </head>
+  <body>
+    <div class="container">
+      <!-- Header -->
+      <header class="header">
+        <h1>🚀 Social Media Automator</h1>
+        <p>Post to all platforms instantly</p>
+      </header>
+
+      <!-- Main Content -->
+      <main class="main">
+        <!-- Text Input Section -->
+        <section class="section">
+          <h2>✍️ Write Description</h2>
+          <textarea
+            id="descriptionInput"
+            placeholder="Write your post description (max 5000 characters)..."
+            maxlength="5000"
+            rows="5"
+          ></textarea>
+          <div class="char-count"><span id="charCount">0</span> / 5000</div>
+        </section>
+
+        <!-- Media Source Instructions -->
+        <section class="section">
+          <h2>📱 Media Source (Optional)</h2>
+          <textarea
+            id="mediaSourceInput"
+            placeholder="Instructions for collecting media from device. Examples:
+- Gallery recent 5 images
+- All media between Jan 4 and Jan 6
+- Media from last 2 days
+- WhatsApp chat with +91XXXXXXXXXX (last 10 messages)
+- All videos from gallery
+- Screenshots from today
+
+Leave empty if no media needed."
+            rows="4"
+          ></textarea>
+        </section>
+
+        <!-- Links Section -->
+        <section class="section">
+          <h2>🔗 Add Links</h2>
+          <textarea
+            id="linksInput"
+            placeholder="Paste links (one per line)..."
+            rows="3"
+          ></textarea>
+        </section>
+
+        <!-- Platform Selection -->
+        <section class="section">
+          <h2>📱 Platform</h2>
+          <div class="platform-grid">
+            <label class="platform-option">
+              <input type="checkbox" name="platform" value="threads" checked />
+              <span class="platform-label">💬 Threads</span>
+              <span class="platform-desc">500 chars</span>
+            </label>
+          </div>
+        </section>
+
+        <!-- Action Buttons -->
+        <section class="section action-buttons">
+          <button id="postBtn" class="btn btn-primary">
+            🚀 Post to Threads
+          </button>
+          <button id="clearBtn" class="btn btn-secondary">🗑️ Clear All</button>
+        </section>
+
+        <!-- Agent Output Section (always visible) -->
+        <section class="section terminal-section">
+          <div class="terminal-header">
+            <h2>📟 Agent Output</h2>
+            <div class="terminal-controls">
+              <span id="statusIndicator" class="status-indicator">● Idle</span>
+              <button id="clearLogBtn" class="terminal-clear-btn">Clear</button>
+            </div>
+          </div>
+          <div id="terminalLog" class="terminal-log">
+            <div class="log-info">[Ready] Waiting for task...</div>
+          </div>
+          <div class="progress-inline hidden" id="progressInline">
+            <div class="progress-bar-inline">
+              <div
+                id="progressFillInline"
+                class="progress-fill-inline"
+                style="width: 0%"
+              ></div>
+            </div>
+            <span id="progressTextInline">0%</span>
+          </div>
+        </section>
+
+        <!-- Results Section -->
+        <section id="resultsSection" class="section results-section hidden">
+          <h2>📊 Results</h2>
+          <div id="resultsList" class="results-list"></div>
+        </section>
+      </main>
+    </div>
+
+    <script src="{{ url_for('static', filename='app.js') }}"></script>
+  </body>
+</html>

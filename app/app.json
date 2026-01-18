@@ -1,0 +1,27 @@
+{
+  "expo": {
+    "name": "Social Media Automator",
+    "slug": "social-media-automator",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "plugins": [
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Allow to access your photos.",
+          "cameraPermission": "Allow to access your camera."
+        }
+      ]
+    ],
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "ios": {
+      "supportsTabletMode": true
+    },
+    "android": {
+      "package": "com.socialmedia.automator"
+    }
+  }
+}
