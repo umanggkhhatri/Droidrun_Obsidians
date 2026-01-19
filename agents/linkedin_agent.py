@@ -170,109 +170,53 @@ class LinkedInAgent(BasePlatformAgent):
                 "post_text": full_post,
             }
             
-            if media_source_instructions:
-                # Media path provided: enforce media-first via share sheet
-                media_instruction = media_source_instructions.strip()
-                
-                goal = f"""
-                Create a LinkedIn post using media collected FIRST, then add text.
-
-                LINKEDIN COMPOSER LAYOUT:
-                - POST button: CENTER of bottom navigation bar (plus icon)
-                - Composer text input: Main area at top
-                - Media attachment icons (bottom toolbar): Photo | Video | Document | Poll
-                - Post button: Top-right corner (says "Post")
-                - Audience selector: Top of composer (Who can see this)
-
-                LINKEDIN APP LAYOUT:
-                - Bottom navigation: Home | Network | POST (center plus icon) | Notifications | Jobs
-                - Tap POST button (center of bottom nav) to create post
-                - Post creation screen: Text area (top) | Media toolbar (bottom: photo, video, document)
-                - Publish button: "Post" (top-right corner)
-
-                GOOGLE PHOTOS LAYOUT (when browsing for media):
-                - Top-left: Google Photos logo
-                - Top-right (3 icons, right to left): Profile | Notifications | New (plus icon)
-                - New button options: Create album | Collage | Highlight video | Cinematic | Animation | More
-                - Bottom panel (4 buttons): Photos | Collections | Create | Search
-                - CRITICAL: SCROLL TO THE TOP in Photos tab first before looking for the media
-                - Photos tab shows: Media sorted by month
-                - Collections tab shows: People faces | Albums | Documents | App-wise media
-
-                Media collection (priority):
-                1) Follow these EXACT instructions to locate/select media on device: {media_instruction}
-                1a) CRITICAL: If opening Google Photos or any gallery app, SCROLL TO THE TOP first before looking for the media
-                1b) ⭐ IMPORTANT USEFUL METHOD - TRY THIS FIRST: In Google Photos, select ONE media first, then SCROLL to find more media and tap them to add to selection
-                   * STEP-BY-STEP PROCESS:
-                     1. Select the FIRST media item
-                     2. Verify it's selected (check for selection indicator)
-                     3. SCROLL from the MIDDLE OF THE SCREEN to find the NEXT media item
-                        - Scroll the media grid UPWARDS (swipe from bottom area towards top)
-                        - Start scroll gesture a little UPWARDS from the bottom of visible screen to avoid overlay issues
-                     4. Tap to add it to selection
-                     5. Repeat steps 3-4 for each additional media
-                   * CRITICAL: Always scroll from the middle/center of the screen, NOT from edges
-                   * This is the MOST RELIABLE way to select multiple images
-                   * Don't try to select all at once - do it ONE BY ONE in sequence
-                   * ALWAYS attempt this method BEFORE trying any fallback approaches
-                1c) MEDIA SELECTION STRATEGY:
-                   - Image ordering in Photos and in-app "Add media" is NOT trustworthy - they may show different orders
-                   - CRITICAL: You CANNOT select media separately and share them one by one to posting apps - must select all together
-                   - CRITICAL: NEVER use LinkedIn's in-app media picker/gallery - it shows media from all sources in wrong order
-                   - ALWAYS use Google Photos via share sheet - this ensures correct media selection
-                                     - If the scroll method above fails, try these alternative approaches:
-                     * Select one image, then swipe up or down, then tap another image to add it to selection
-                     * Try using the collection/album view if direct media browsing fails
-                     * Try selecting from different tabs (Photos tab vs Collections tab)
-                     * If a specific image won't select, try selecting adjacent images first, then deselect and reselect
-                2) IMPORTANT: After selecting media, if you cannot find the share button or it's hidden behind a banner/overlay:
-                   - Try swiping up slightly to reveal hidden UI elements
-                   - Try tapping on empty space to dismiss any overlays or popups
-                   - Look for share icons in corners or bottom of screen
-                   - If needed, long-press on the media to get context menu with share option
-                   - Scroll/swipe the thumbnail bar if the selected image seems hidden
-                3) Use the system share sheet to share the selected media to LinkedIn (com.linkedin.android)
-                   so the LinkedIn composer opens with the media already attached.
-
-                Compose in LinkedIn:
-                3) Call get_post_text() to retrieve the post content ({len(full_post)} characters)
-                4) Store the returned text in a variable: post_content = get_post_text()
-                5) Type the ENTIRE returned text into the post field using: type(text=post_content, index=...)
-                6) Tap "Post" to publish.
-
-                CRITICAL: The get_post_text() tool returns the ACTUAL post from the system.
-                You MUST use that exact text - do NOT generate or summarize your own text.
-                
-                Return success status and any confirmation info.
-                """
-            else:
-                # No media path: open LinkedIn directly
-                media_str = f"Media URLs: {', '.join(all_media)}" if all_media else "No external media"
-                
-                goal = f"""
-                Post to LinkedIn:
-                
-                LINKEDIN COMPOSER LAYOUT:
-                - POST button: CENTER of bottom navigation bar (plus icon)
-                - Text input: Top of composer screen
-                - Media attachment icons (bottom): Photo | Video | Document | Poll
-                - Audience selector: Top-left (Who can see this)
-                - Post button: Top-right (says "Post")
-                - Bottom navigation: Home | Network | POST (center) | Notifications | Jobs
-                
-                1. Open LinkedIn app (com.linkedin.android)
-                2. Tap "Start a post" or the POST "+" button (center of bottom nav)
-                3. Call get_post_text() to retrieve the post content ({len(full_post)} characters)
-                4. Store the returned text: post_content = get_post_text()
-                5. Type the ENTIRE returned text into the post field
-                6. {f"Attach media from: {media_str}" if all_media else "No media to attach"}
-                7. Tap "Post" to publish
-
-                CRITICAL: The get_post_text() tool returns the ACTUAL post from the system.
-                You MUST use that exact text - do NOT generate your own text.
-                
-                Return success status and any confirmation info.
-                """
+            # CRITICAL: LinkedIn posting flow - ALWAYS open LinkedIn app directly, NO Google Photos
+            # User explicitly requested: Open LinkedIn from home screen, click post button at bottom, write and post
+            # This applies regardless of whether media_source_instructions are provided
+            
+            goal = f"""
+            Post to LinkedIn - Open LinkedIn app directly, NO Google Photos:
+            
+            LINKEDIN APP LAYOUT:
+            - Bottom navigation bar: Home | Network | POST (center, plus icon) | Notifications | Jobs
+            - POST button: CENTER of bottom navigation bar (plus "+" icon)
+            - Home screen: Shows feed with posts
+            
+            LINKEDIN COMPOSER LAYOUT (after tapping POST button):
+            - Text input field: Top of screen (says "What do you want to talk about?" or similar)
+            - Media attachment icons (bottom toolbar): Photo | Video | Document | Poll
+            - Audience selector: Top-left (Who can see this)
+            - Post button: Top-right corner (says "Post")
+            
+            CRITICAL INSTRUCTIONS:
+            1. Start from Android HOME SCREEN (not Google Photos, not any other app)
+            2. Open LinkedIn app (com.linkedin.android) - look for LinkedIn icon
+            3. Wait for LinkedIn home screen to load (you should see the feed)
+            4. Look at the BOTTOM navigation bar - find the POST button in the CENTER (plus "+" icon)
+            5. Tap the POST button at the BOTTOM center of the screen
+            6. Wait for the composer screen to open (you should see text input field at top)
+            7. Call get_post_text() to retrieve the post content ({len(full_post)} characters)
+            8. Store the returned text: post_content = get_post_text()
+            9. Type the ENTIRE returned text into the text input field using: type(text=post_content, index=...)
+            10. Look for the "Post" button at the TOP-RIGHT corner
+            11. Tap the "Post" button to publish
+            12. Wait for confirmation that the post was published (screen should change or show success)
+            13. After posting, press HOME button (or swipe up from bottom) to return to Android home screen
+            14. Verify you're on the home screen before finishing
+            
+            CRITICAL RULES:
+            - DO NOT open Google Photos
+            - DO NOT use share sheet
+            - DO NOT navigate through any gallery app
+            - START from Android HOME SCREEN
+            - OPEN LinkedIn app directly
+            - Use the POST button at BOTTOM CENTER of LinkedIn app
+            - The get_post_text() tool returns the ACTUAL post from the system
+            - You MUST use that exact text - do NOT generate or summarize your own text
+            - You MUST publish the post by tapping the Post button - don't leave it as draft
+            
+            Return success status and any confirmation info.
+            """
             
             result = await self._run_droidrun_agent(goal, variables=agent_variables)
             

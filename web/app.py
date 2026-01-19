@@ -229,9 +229,26 @@ def post_content():
         
         # Parse platforms
         try:
-            platforms = json.loads(platforms_json)
-        except (json.JSONDecodeError, TypeError):
+            platforms_raw = json.loads(platforms_json)
+            emit_log(f'📥 RAW platform data received: {platforms_raw} (type: {type(platforms_raw)})', 'info')
+            
+            # Normalize platform names (lowercase, strip whitespace)
+            platforms = [p.lower().strip() for p in platforms_raw if p]
+            emit_log(f'📋 Normalized platforms: {platforms}', 'info')
+        except (json.JSONDecodeError, TypeError) as e:
+            emit_log(f'❌ Error parsing platforms JSON: {e}', 'error')
             platforms = []
+        
+        # CRITICAL: Validate platform names match expected values
+        valid_platform_names = {'twitter', 'threads', 'instagram', 'linkedin'}
+        invalid_platforms = [p for p in platforms if p not in valid_platform_names]
+        if invalid_platforms:
+            emit_log(f'⚠️  Invalid platform names detected: {invalid_platforms}', 'warning')
+            platforms = [p for p in platforms if p in valid_platform_names]
+        
+        # CRITICAL: Log final validated platforms
+        emit_log(f'✅ VALIDATED platform selection: {platforms}', 'step')
+        emit_log(f'   Count: {len(platforms)} platform(s)', 'info')
         
         # Validation: require at least text, media instructions, or links
         if not text and not media_source_instructions and not links:
@@ -245,6 +262,9 @@ def post_content():
                 'success': False,
                 'message': 'Please select at least one platform'
             }), 400
+        
+        # CRITICAL: Log and validate platform selection
+        emit_log(f'✅ Platform selection validated: {platforms}', 'step')
         
         # === STEP 1: CRAWL LINKS FIRST ===
         crawled_content = ""
@@ -362,22 +382,61 @@ def post_content():
                 'message': 'Droidrun config not loaded. Ensure ~/.droidrun/config.yaml exists'
             }), 500
         
-        # Initialize agents for all platforms (400s timeout for device automation with media handling)
-        threads_agent = ThreadsAgent(droidrun_config, timeout=400)
-        instagram_agent = InstagramAgent(droidrun_config, timeout=400)
-        twitter_agent = TwitterAgent(droidrun_config, timeout=400)
-        linkedin_agent = LinkedInAgent(droidrun_config, timeout=400)
+        # CRITICAL: Create agents_map FIRST, then ONLY initialize agents for SELECTED platforms
+        # This prevents any accidental initialization of non-selected agents
+        agents_map = {}
         
-        # Map platforms to agents
-        agents_map = {
-            'threads': threads_agent,
-            'instagram': instagram_agent,
-            'twitter': twitter_agent,
-            'linkedin': linkedin_agent,
-        }
+        # CRITICAL: ONLY initialize agents for platforms that were selected by the user
+        # Do NOT initialize agents for platforms that weren't selected
+        if 'threads' in platforms:
+            agents_map['threads'] = ThreadsAgent(droidrun_config, timeout=400)
+            emit_log(f'✅ Initialized Threads agent (SELECTED)', 'info')
         
-        # Filter to only requested platforms that are available
+        if 'instagram' in platforms:
+            agents_map['instagram'] = InstagramAgent(droidrun_config, timeout=400)
+            emit_log(f'✅ Initialized Instagram agent (SELECTED)', 'info')
+        
+        if 'twitter' in platforms:
+            agents_map['twitter'] = TwitterAgent(droidrun_config, timeout=400)
+            emit_log(f'✅ Initialized Twitter/X agent (SELECTED)', 'info')
+        
+        if 'linkedin' in platforms:
+            agents_map['linkedin'] = LinkedInAgent(droidrun_config, timeout=400)
+            emit_log(f'✅ Initialized LinkedIn agent (SELECTED)', 'info')
+        
+        # CRITICAL: Final validation - ensure platforms list matches agents_map keys exactly
+        # Remove any platforms that don't have agents initialized
         platforms = [p for p in platforms if p in agents_map]
+        
+        # CRITICAL: Log what we're about to do
+        emit_log(f'🔒 FINAL VERIFICATION:', 'step')
+        emit_log(f'   Selected platforms: {platforms}', 'info')
+        emit_log(f'   Agents initialized: {list(agents_map.keys())}', 'info')
+        emit_log(f'   These MUST match exactly!', 'info')
+        
+        # CRITICAL: Double-check we have platforms to post to
+        if not platforms:
+            emit_log(f'❌ No valid platforms to post to after filtering', 'error')
+            return jsonify({
+                'success': False,
+                'message': f'No valid platforms selected. Available: {list(agents_map.keys())}'
+            }), 400
+        
+        # CRITICAL: Verify platforms and agents match exactly
+        if set(platforms) != set(agents_map.keys()):
+            emit_log(f'❌ CRITICAL ERROR: Platform mismatch detected!', 'error')
+            emit_log(f'   Platforms: {platforms}', 'error')
+            emit_log(f'   Agents: {list(agents_map.keys())}', 'error')
+            return jsonify({
+                'success': False,
+                'message': 'Platform selection mismatch - this should never happen'
+            }), 500
+        
+        # CRITICAL: Log final platform list that will be posted to - this is the ONLY list we'll use
+        emit_log(f'🎯 FINAL platform list (will post to these ONLY): {platforms}', 'step')
+        emit_log(f'📊 Total platforms to process: {len(platforms)}', 'info')
+        emit_log(f'🔒 PLATFORM SELECTION LOCKED - Will NOT post to any other platforms', 'step')
+        emit_log(f'🚫 Agents NOT initialized for: {[p for p in ["threads", "instagram", "twitter", "linkedin"] if p not in platforms]}', 'info')
         
         # Post to each platform with progress updates
         formatted_results = []
@@ -395,8 +454,20 @@ def post_content():
         
         current_step = 2
         for platform in platforms:
+            # CRITICAL: Triple-check platform is in agents_map and was selected
             if platform not in agents_map:
+                emit_log(f'❌ CRITICAL ERROR: Platform {platform} not in agents_map, ABORTING', 'error')
+                emit_log(f'   This should never happen - platform was not selected!', 'error')
                 continue
+            
+            # CRITICAL: Verify this platform was in the original selection
+            if platform not in platforms:
+                emit_log(f'❌ CRITICAL ERROR: Platform {platform} not in selected platforms, ABORTING', 'error')
+                continue
+            
+            # Log which platform we're about to post to
+            emit_log(f'🚀 Starting posting to {platform.upper()} (step {current_step-1}/{len(platforms)})', 'step')
+            emit_log(f'✅ Platform {platform.upper()} confirmed as SELECTED - proceeding', 'info')
             
             try:
                 # Emit progress for this platform

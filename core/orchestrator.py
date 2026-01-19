@@ -81,12 +81,15 @@ class ContentOrchestrator:
         self.collected_content: Optional[Content] = None
         self.context_data: Dict[str, Any] = {}
 
-    async def run_full_workflow(self, media_urls: List[str] = None) -> Dict[str, PostResult]:
+    async def run_full_workflow(self, media_urls: List[str] = None, selected_platforms: List[str] = None) -> Dict[str, PostResult]:
         """
         Run the complete workflow from content collection to posting
         
         Args:
             media_urls: Optional list of media URLs to attach to posts
+            selected_platforms: Optional list of platform names to post to. 
+                               If None, uses all enabled platforms from config.
+                               If provided, ONLY posts to these platforms (must be enabled in config).
         
         Returns:
             Dictionary mapping platform names to PostResult objects
@@ -109,7 +112,7 @@ class ContentOrchestrator:
             logger.info(f"Context gathered from {len(self.context_data)} sources")
             
             # Step 3-6: Post to platforms sequentially
-            await self._step_post_to_platforms(media_urls)
+            await self._step_post_to_platforms(media_urls, selected_platforms)
             
             # Final report
             logger.info("\n" + "=" * 60)
@@ -155,7 +158,7 @@ class ContentOrchestrator:
             logger.error(f"Failed during crawling: {str(e)}", exc_info=True)
             return {}
 
-    async def _step_post_to_platforms(self, media_urls: Optional[List[str]] = None) -> None:
+    async def _step_post_to_platforms(self, media_urls: Optional[List[str]] = None, selected_platforms: Optional[List[str]] = None) -> None:
         """Steps 3-6: Post to platforms sequentially"""
         if not self.collected_content:
             logger.error("No content to post")
@@ -169,23 +172,57 @@ class ContentOrchestrator:
             "urls": self.collected_content.extracted_urls,
         }
         
-        # Platform posting sequence
-        platforms = [
+        # Determine which platforms to post to
+        all_available_platforms = [
             ("twitter", self.twitter_agent, "[3/6]"),
             ("threads", self.threads_agent, "[4/6]"),
             ("instagram", self.instagram_agent, "[5/6]"),
             ("linkedin", self.linkedin_agent, "[6/6]"),
         ]
         
+        # If selected_platforms is provided, ONLY use those (and verify they're enabled)
+        if selected_platforms:
+            selected_set = set(selected_platforms)
+            logger.info(f"📋 Selected platforms from user: {selected_platforms}")
+            
+            # Filter to only selected platforms that are also enabled
+            platforms = [
+                (name, agent, indicator) 
+                for name, agent, indicator in all_available_platforms
+                if name in selected_set and self.app_config.PLATFORMS[name]["enabled"]
+            ]
+            
+            # Log any selected platforms that are disabled
+            disabled_selected = [
+                name for name in selected_platforms 
+                if name not in [p[0] for p in platforms]
+            ]
+            if disabled_selected:
+                logger.warning(f"⚠️  Selected platforms {disabled_selected} are disabled in config - skipping")
+            
+            # Log any selected platforms that don't exist
+            invalid_selected = [
+                name for name in selected_platforms 
+                if name not in [p[0] for p in all_available_platforms]
+            ]
+            if invalid_selected:
+                logger.warning(f"⚠️  Invalid platform names {invalid_selected} - ignoring")
+        else:
+            # No selection provided - use all enabled platforms (backward compatibility)
+            platforms = [
+                (name, agent, indicator)
+                for name, agent, indicator in all_available_platforms
+                if self.app_config.PLATFORMS[name]["enabled"]
+            ]
+            logger.info(f"📋 No platform selection provided - using all enabled platforms: {[p[0] for p in platforms]}")
+        
+        if not platforms:
+            logger.warning("⚠️  No platforms to post to (all disabled or none selected)")
+            return {}
+        
+        logger.info(f"✅ Will post to {len(platforms)} platform(s): {[p[0] for p in platforms]}")
+        
         for platform_name, agent, step_indicator in platforms:
-            if not self.app_config.PLATFORMS[platform_name]["enabled"]:
-                logger.info(f"\n{step_indicator} {platform_name.upper()} - Skipped (disabled)")
-                self.results[platform_name] = PostResult(
-                    platform=platform_name,
-                    success=False,
-                    reason="Platform disabled in configuration",
-                )
-                continue
             
             logger.info(f"\n{step_indicator} Posting to {platform_name.upper()}...")
             
@@ -201,8 +238,10 @@ class ContentOrchestrator:
             status = "✓ Success" if result.success else "✗ Failed"
             logger.info(f"  {status}: {result.reason}")
             
-            # Add small delay between platforms to avoid rate limiting
+            # After each platform, return to home screen and start fresh
             if platform_name != platforms[-1][0]:  # Not last platform
+                logger.info(f"  Returning to home screen before next platform...")
+                await self._return_to_home_screen()
                 await asyncio.sleep(2)
 
     def _print_results_summary(self) -> None:
@@ -224,6 +263,33 @@ class ContentOrchestrator:
             if result.error:
                 logger.debug(f"    Error: {result.error}")
 
+    async def _return_to_home_screen(self) -> None:
+        """Return to home screen after completing a platform"""
+        try:
+            from droidrun import DroidAgent
+            
+            goal = """
+            Return to the Android home screen:
+            1. Press the HOME button (or swipe up from bottom if using gesture navigation)
+            2. Wait for the home screen to fully load
+            3. Verify you're on the home screen (should see app icons/widgets)
+            4. Return success status.
+            
+            CRITICAL: Make sure you're completely back on the home screen before finishing.
+            This ensures a clean start for the next platform.
+            """
+            
+            agent = DroidAgent(goal=goal, config=self.config)
+            result = await agent.run(timeout=10)
+            
+            if result.success:
+                logger.debug("Successfully returned to home screen")
+            else:
+                logger.warning(f"Failed to return to home screen: {result.reason}")
+        except Exception as e:
+            logger.warning(f"Error returning to home screen: {str(e)}")
+            # Continue anyway - not critical
+    
     async def _save_results(self) -> None:
         """Save results to file"""
         try:
@@ -255,6 +321,7 @@ async def run_workflow(
     droidrun_config: DroidrunConfig = None,
     app_config: Any = None,
     media_urls: List[str] = None,
+    selected_platforms: List[str] = None,
 ) -> Dict[str, PostResult]:
     """
     Convenience function to run the complete workflow
@@ -264,6 +331,9 @@ async def run_workflow(
         droidrun_config: Optional DroidrunConfig (uses default if not provided)
         app_config: Optional application configuration
         media_urls: Optional media URLs to attach
+        selected_platforms: Optional list of platform names to post to.
+                           If None, uses all enabled platforms from config.
+                           If provided, ONLY posts to these platforms.
     
     Returns:
         Dictionary of results by platform
@@ -271,4 +341,4 @@ async def run_workflow(
     droidrun_config = droidrun_config or DroidrunConfig()
     
     orchestrator = ContentOrchestrator(droidrun_config, phone_number, app_config)
-    return await orchestrator.run_full_workflow(media_urls)
+    return await orchestrator.run_full_workflow(media_urls, selected_platforms)

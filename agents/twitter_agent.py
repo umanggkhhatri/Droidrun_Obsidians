@@ -118,10 +118,10 @@ class TwitterAgent(BasePlatformAgent):
                 logger.info(f"📝 Received text for posting ({len(user_text)} chars): {user_text[:150]}...")
                 
                 if user_text and len(user_text.strip()) > 10:
-                    # Truncate to fit tweet limit
+                    # Truncate to 60 characters max for X/Twitter (short description)
                     final_text = user_text.strip()
-                    if len(final_text) > self.tweet_max_length - 30:  # Reserve space for hashtags
-                        final_text = truncate_text(final_text, self.tweet_max_length - 30)
+                    if len(final_text) > 60:
+                        final_text = truncate_text(final_text, 60)
                     
                     prepared = {
                         "text": final_text,
@@ -129,7 +129,7 @@ class TwitterAgent(BasePlatformAgent):
                         "thread": [],
                         "media_source_instructions": media_instructions
                     }
-                    logger.info(f"✅ Prepared tweet for posting ({len(final_text)} chars)")
+                    logger.info(f"✅ Prepared tweet for posting ({len(final_text)} chars, max 60)")
                 else:
                     prepared = self._fallback_prepare_content(content, context)
                     prepared["media_source_instructions"] = media_instructions
@@ -149,7 +149,7 @@ class TwitterAgent(BasePlatformAgent):
 
             # Fallback if missing or weak
             text = prepared.get("text", "")
-            if not text or len(text) < 40:
+            if not text or len(text) < 10:
                 prepared = self._fallback_prepare_content(content, context)
 
             # Normalize fields
@@ -158,10 +158,9 @@ class TwitterAgent(BasePlatformAgent):
             prepared["hashtags"] = hashtags
             prepared.setdefault("thread", [])
 
-            # Truncate tweet to fit including hashtags
+            # Truncate tweet to 60 characters max (short description for X)
             base = prepared.get("text", "")
-            reserve = sum(len(h) + 1 for h in hashtags)
-            trimmed = truncate_text(base, max(50, self.tweet_max_length - reserve - 1))
+            trimmed = truncate_text(base, 60)
             prepared["text"] = trimmed
 
             logger.info("Twitter content prepared successfully")
@@ -285,6 +284,11 @@ class TwitterAgent(BasePlatformAgent):
                     You MUST use that exact text - do NOT generate or summarize your own text.
                     You MUST publish the tweet by tapping the Post button - don't leave it as draft.
                     
+                    After posting:
+                    9) Wait for confirmation that the tweet was published
+                    10) Press HOME button (or swipe up from bottom) to return to Android home screen
+                    11) Verify you're on the home screen before finishing
+                    
                     Return success status and any confirmation info.
                     """
                 else:
@@ -314,6 +318,11 @@ class TwitterAgent(BasePlatformAgent):
                         You MUST use that exact text - do NOT generate your own text.
                         You MUST publish the tweet by tapping the Post button - don't leave it as draft.
                         
+                        After posting:
+                        8) Wait for confirmation that the tweet was published
+                        9) Press HOME button (or swipe up from bottom) to return to Android home screen
+                        10) Verify you're on the home screen before finishing
+                        
                         Return success status and any confirmation info.
                         """
                     else:
@@ -339,6 +348,11 @@ class TwitterAgent(BasePlatformAgent):
                         CRITICAL: The get_post_text() tool returns the ACTUAL tweet for this chunk.
                         You MUST use that exact text - do NOT generate your own text.
                         You MUST publish the reply by tapping the Reply/Post button - don't leave it as draft.
+                        
+                        After posting:
+                        8) Wait for confirmation that the reply was published
+                        9) If this is the last chunk, press HOME button (or swipe up from bottom) to return to Android home screen
+                        10) Verify you're on the home screen before finishing (if last chunk)
                         
                         Return success status and any confirmation info.
                         """
@@ -383,21 +397,21 @@ class TwitterAgent(BasePlatformAgent):
         - What is the single most interesting detail to lead with?
         - Keep it authentic; avoid corporate or boilerplate tone.
         
-        Write an engaging post:
-        - **Hook first:** Make the opening line irresistible (curiosity, surprise, warmth, or delight)
-        - **Body:** Be specific to the content; avoid generic claims. If personal, make it relatable; if product/tech, make it clear and tangible
-        - **Length:** Aim 200-240 chars
-        - **Hashtags:** 2-5 relevant tags that match the content (personal/lifestyle/creative/tech as appropriate)
-        - **Thread:** Optional 2-4 follow-ups only if there’s more story/detail to add
+        Write a SHORT, engaging description:
+        - **Hook first:** Make the opening irresistible (curiosity, surprise, warmth, or delight)
+        - **Be specific:** Avoid generic claims. If personal, make it relatable; if product/tech, make it clear
+        - **Length:** MAXIMUM 60 characters - keep it SHORT and punchy
+        - **Hashtags:** 0-2 relevant tags (optional, keep minimal)
+        - **No thread:** Single tweet only, no follow-ups
         
         CONTENT TO TRANSFORM:
         {context}
         
         Respond with this JSON structure:
         {{
-          "text": "Your main tweet (200-240 chars, hook first, authentic, specific to the content)",
-          "hashtags": ["#Tag1", "#Tag2", "#Tag3"],
-          "thread": ["Optional follow-up line 1", "Optional follow-up line 2"]
+          "text": "Your short tweet (MAX 60 chars, hook first, authentic, specific)",
+          "hashtags": ["#Tag1", "#Tag2"],
+          "thread": []
         }}
         
         Respond ONLY with valid JSON. No other text.
@@ -439,19 +453,12 @@ class TwitterAgent(BasePlatformAgent):
         except Exception:
             pass
 
-        text = (
-            f"{name.title()} just dropped — quick, useful, and fun to try. "
-            f"Give it a spin and see what you can build!"
-        )
-        hashtags = ["#Tech", "#BuildInPublic", "#Product", "#DevLife", "#New"]
-        thread = [
-            "What it does in 1 line",
-            "Top 2-3 benefits",
-            "Try it now — link in bio/profile",
-        ]
+        text = f"{name.title()} just dropped — quick and useful!"
+        hashtags = ["#Tech", "#New"]
+        thread = []
 
         return {
-            "text": truncate_text(text, 240),
+            "text": truncate_text(text, 60),
             "hashtags": hashtags,
             "thread": thread,
         }

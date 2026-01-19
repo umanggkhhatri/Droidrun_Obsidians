@@ -50,7 +50,7 @@ class BasePlatformAgent(ABC):
 
     async def prepare_and_post(
         self,
-        content: str,
+        content: str | Dict[str, Any],
         context: Dict[str, Any],
         media_urls: List[str] = None,
         **kwargs
@@ -59,7 +59,7 @@ class BasePlatformAgent(ABC):
         Main method to prepare content and post it
         
         Args:
-            content: Original content text
+            content: Original content text (str) or content dict with text/media/videos/urls keys
             context: Context data from crawled URLs
             media_urls: Optional media URLs to include
             **kwargs: Additional platform-specific arguments
@@ -97,7 +97,7 @@ class BasePlatformAgent(ABC):
     @abstractmethod
     async def _prepare_content(
         self,
-        content: str,
+        content: str | Dict[str, Any],
         context: Dict[str, Any],
         **kwargs
     ) -> Optional[Dict[str, Any]]:
@@ -107,7 +107,7 @@ class BasePlatformAgent(ABC):
         Should be implemented by subclasses to create platform-specific content
         
         Args:
-            content: Original content
+            content: Original content (str) or dict with text/media/videos/urls keys
             context: Context data
             **kwargs: Additional arguments
         

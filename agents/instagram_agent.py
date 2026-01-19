@@ -239,10 +239,21 @@ class InstagramAgent(BasePlatformAgent):
                 4) Call get_post_text() to retrieve the caption ({len(full_caption)} characters)
                 5) Store the returned text in a variable: caption_content = get_post_text()
                 6) Type the ENTIRE returned caption into the caption field using: type(text=caption_content, index=...)
-                7) Tap "Share" or "Post" to publish.
+                7) After typing the caption, look for the "Share" button
+                8) IMPORTANT: The Share button is located at the BOTTOM of the screen (not top-right)
+                9) Tap the Share button at the BOTTOM
+                10) Wait for confirmation that the post was published - the screen should change (e.g., return to feed or show success message)
+                11) Verify the post is done by checking if the screen changed or if you see a success confirmation
+                12) Return success status only after confirming the post was published.
 
                 CRITICAL: The get_post_text() tool returns the ACTUAL caption from the system.
                 You MUST use that exact text - do NOT generate or summarize your own caption.
+                CRITICAL: After writing the description, you MUST tap the Share button at the BOTTOM of the screen.
+                CRITICAL: Wait for the screen to change or show confirmation before considering the post done.
+                
+                After posting:
+                13) After confirming the post was published, press HOME button (or swipe up from bottom) to return to Android home screen
+                14) Verify you're on the home screen before finishing
                 
                 Return success status and any confirmation info.
                 """
@@ -267,10 +278,17 @@ class InstagramAgent(BasePlatformAgent):
                 5. Call get_post_text() to retrieve the caption ({len(full_caption)} characters)
                 6. Store the returned text: caption_content = get_post_text()
                 7. Type the ENTIRE caption into the caption field
-                8. Tap "Share" to publish
+                8. After typing the caption, look for the "Share" button
+                9) IMPORTANT: The Share button is located at the BOTTOM of the screen (not top-right)
+                10) Tap the Share button at the BOTTOM
+                11) Wait for confirmation that the post was published - the screen should change (e.g., return to feed or show success message)
+                12) Verify the post is done by checking if the screen changed or if you see a success confirmation
+                13) Return success status only after confirming the post was published
 
                 CRITICAL: The get_post_text() tool returns the ACTUAL caption from the system.
                 You MUST use that exact text - do NOT generate your own caption.
+                CRITICAL: After writing the description, you MUST tap the Share button at the BOTTOM of the screen.
+                CRITICAL: Wait for the screen to change or show confirmation before considering the post done.
                 
                 Return success status and any confirmation info.
                 """

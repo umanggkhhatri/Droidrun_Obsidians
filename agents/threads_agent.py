@@ -303,6 +303,11 @@ class ThreadsAgent(BasePlatformAgent):
                     You MUST use that exact text - do NOT generate or summarize your own text.
                     You MUST publish the post by tapping the Post/Share button - don't leave it as draft.
                     
+                    After posting:
+                    10) Wait for confirmation that the post was published
+                    11) If this is the last chunk, press HOME button (or swipe up from bottom) to return to Android home screen
+                    12) Verify you're on the home screen before finishing (if last chunk)
+                    
                     Return success status and any confirmation info.
                     """
                 else:
@@ -323,6 +328,11 @@ class ThreadsAgent(BasePlatformAgent):
                         CRITICAL: The get_post_text() tool returns the ACTUAL post content for this chunk.
                         You MUST use that exact text - do NOT generate or summarize your own text.
                         You MUST publish the post by tapping the Post/Share button - don't leave it as draft.
+                        
+                        After posting:
+                        8) Wait for confirmation that the post was published
+                        9) Press HOME button (or swipe up from bottom) to return to Android home screen
+                        10) Verify you're on the home screen before finishing
                         
                         Return success status and any confirmation info.
                         """
@@ -351,6 +361,11 @@ class ThreadsAgent(BasePlatformAgent):
                         CRITICAL: The get_post_text() tool returns the ACTUAL post content for this chunk.
                         You MUST use that exact text - do NOT generate or summarize your own text.
                         You MUST publish the reply by tapping the Post/Reply button - don't leave it as draft.
+                        
+                        After posting:
+                        8) Wait for confirmation that the reply was published
+                        9) If this is the last chunk, press HOME button (or swipe up from bottom) to return to Android home screen
+                        10) Verify you're on the home screen before finishing (if last chunk)
                         
                         Return success status and any confirmation info.
                         """

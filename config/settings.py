@@ -56,6 +56,10 @@ class Config:
     # Retry settings
     MAX_RETRIES = int(os.getenv("MAX_RETRIES", "3"))
     RETRY_DELAY = int(os.getenv("RETRY_DELAY", "2"))  # seconds
+    
+    # Result persistence
+    SAVE_POSTS_TO_FILE = os.getenv("SAVE_POSTS_TO_FILE", "true").lower() == "true"
+    RESULTS_OUTPUT_DIR = os.getenv("RESULTS_OUTPUT_DIR", "results")
 
 
 class DevelopmentConfig(Config):

@@ -13,8 +13,8 @@ from core import (
 from agents import (
     InstagramAgent,
     LinkedInAgent,
-    RedditAgent,
-    FacebookAgent,
+    TwitterAgent,
+    ThreadsAgent,
 )
 from config.settings import get_config
 
@@ -111,24 +111,23 @@ async def example_4_url_crawling_only():
         print(f"- {url}: {len(data['content'])} chars")
 
 
-async def example_5_custom_reddit_subreddit():
-    """Example 5: Post to specific Reddit subreddit"""
+async def example_5_custom_twitter_thread():
+    """Example 5: Post to Twitter with thread"""
     print("\n" + "="*60)
-    print("Example 5: Custom Reddit Subreddit")
+    print("Example 5: Custom Twitter Thread")
     print("="*60)
     
     config = DroidrunConfig()
     
-    # Create Reddit agent for specific subreddit
-    reddit = RedditAgent(config, subreddit="Python")
+    # Create Twitter agent
+    twitter = TwitterAgent(config, timeout=60)
     
     sample_content = "Released a new async Python library!"
     sample_context = {"project": "async-framework"}
     
-    result = await reddit.prepare_and_post(
+    result = await twitter.prepare_and_post(
         sample_content,
         sample_context,
-        subreddit="learnprogramming",  # Override default
     )
     
     print(f"Posted to: {result.reason}")
@@ -163,8 +162,8 @@ async def example_7_selective_platforms():
     app_config = get_config("production")
     
     # Disable certain platforms
-    app_config.PLATFORMS["facebook"]["enabled"] = False
-    app_config.PLATFORMS["reddit"]["enabled"] = False
+    app_config.PLATFORMS["twitter"]["enabled"] = False
+    app_config.PLATFORMS["threads"]["enabled"] = False
     
     print("Platforms enabled:")
     for platform, settings in app_config.PLATFORMS.items():

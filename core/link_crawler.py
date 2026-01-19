@@ -1,7 +1,7 @@
 """HTTP-based link crawler for extracting context from URLs"""
 
 import re
-from typing import Dict, List, Optional, Set
+from typing import Dict, List, Optional, Set, Any
 from urllib.parse import urlparse, urljoin
 
 import requests
@@ -23,16 +23,25 @@ class LinkCrawler:
 
     def __init__(
         self,
-        max_links_per_page: int = 10,
+        config: Optional[Any] = None,
+        max_depth: int = 2,
+        max_urls: int = 5,
         timeout: int = 15,
+        max_links_per_page: int = 10,
     ):
         """
         Initialize HTTP link crawler
         
         Args:
-            max_links_per_page: Maximum internal links to follow per page (default: 10)
+            config: Optional DroidrunConfig (kept for compatibility, not used)
+            max_depth: Maximum crawl depth (default: 2, currently not used but kept for compatibility)
+            max_urls: Maximum URLs to crawl (default: 5)
             timeout: Request timeout in seconds (default: 15)
+            max_links_per_page: Maximum internal links to follow per page (default: 10)
         """
+        self.config = config
+        self.max_depth = max_depth
+        self.max_urls = max_urls
         self.max_links_per_page = max_links_per_page
         self.timeout = timeout
         self.visited_urls: Set[str] = set()
@@ -219,6 +228,43 @@ class LinkCrawler:
                     internal_links.append(normalized)
         
         return internal_links
+
+    async def crawl_for_context(self, urls: List[str]) -> Dict[str, Any]:
+        """
+        Crawl multiple URLs and return context dictionary.
+        
+        Args:
+            urls: List of URLs to crawl
+        
+        Returns:
+            Dictionary mapping URLs to their crawled content
+        """
+        context = {}
+        urls_to_crawl = urls[:self.max_urls]  # Limit to max_urls
+        
+        for url in urls_to_crawl:
+            if url in self.visited_urls:
+                continue
+            
+            try:
+                content = self.crawl_url(url)
+                if content:
+                    context[url] = {
+                        "content": content,
+                        "url": url,
+                    }
+                    logger.info(f"✓ Crawled {url}: {len(content)} chars")
+                else:
+                    logger.warning(f"⚠️ No content extracted from {url}")
+            except Exception as e:
+                logger.error(f"Error crawling {url}: {str(e)}")
+                context[url] = {
+                    "content": "",
+                    "url": url,
+                    "error": str(e),
+                }
+        
+        return context
 
     def reset(self) -> None:
         """Reset crawler state"""
