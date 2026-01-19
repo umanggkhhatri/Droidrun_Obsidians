@@ -171,6 +171,12 @@ class InstagramAgent(BasePlatformAgent):
                 media_instruction = media_source_instructions.strip()
                 
                 goal = f"""
+                ⚠️ CRITICAL: FOCUS ONLY ON INSTAGRAM - DO NOT OPEN ANY OTHER PLATFORMS
+                - You are ONLY posting to Instagram right now
+                - DO NOT open Twitter/X, Threads, LinkedIn, or any other social media apps
+                - Complete this Instagram task FULLY before finishing
+                - Return to home screen ONLY after Instagram posting is complete
+                
                 Create an Instagram post using media collected FIRST, then add text.
 
                 INSTAGRAM COMPOSER LAYOUT:
@@ -239,16 +245,29 @@ class InstagramAgent(BasePlatformAgent):
                 4) Call get_post_text() to retrieve the caption ({len(full_caption)} characters)
                 5) Store the returned text in a variable: caption_content = get_post_text()
                 6) Type the ENTIRE returned caption into the caption field using: type(text=caption_content, index=...)
-                7) After typing the caption, look for the "Share" button
-                8) IMPORTANT: The Share button is located at the BOTTOM of the screen (not top-right)
-                9) Tap the Share button at the BOTTOM
-                10) Wait for confirmation that the post was published - the screen should change (e.g., return to feed or show success message)
-                11) Verify the post is done by checking if the screen changed or if you see a success confirmation
-                12) Return success status only after confirming the post was published.
+                7) After typing the caption, you MUST find and tap the "Share" button to publish
+                8) CRITICAL: Finding the Share button - check these locations in order:
+                   a) Look at the BOTTOM of the screen first - there may be a "Share" button in the bottom toolbar
+                   b) Look at the TOP-RIGHT corner - there may be a "Share" or "Post" button
+                   c) Scroll down slightly if the button is hidden - sometimes the Share button is below the visible area
+                   d) Look for any button that says "Share", "Post", "Publish", or has a share icon (arrow pointing right/up)
+                   e) The Share button might be in a fixed position at the bottom, even if you need to scroll to see it
+                9) Once you find the Share button, tap it immediately
+                10) CRITICAL: If you cannot find the Share button:
+                   - Try scrolling the screen up or down to reveal hidden buttons
+                   - Look for any button with text like "Share", "Post", "Next", or "Done"
+                   - Check if there's a button at the very bottom edge of the screen
+                   - The Share button is ESSENTIAL - you MUST find and tap it to publish
+                11) After tapping Share, wait for confirmation that the post was published
+                12) The screen should change (e.g., return to feed, show "Your post has been shared", or show the post in your profile)
+                13) Verify the post is done by checking if the screen changed or if you see a success confirmation
+                14) Return success status only after confirming the post was published.
 
                 CRITICAL: The get_post_text() tool returns the ACTUAL caption from the system.
                 You MUST use that exact text - do NOT generate or summarize your own caption.
-                CRITICAL: After writing the description, you MUST tap the Share button at the BOTTOM of the screen.
+                CRITICAL: After writing the description, you MUST find and tap the Share button - this is REQUIRED to publish.
+                CRITICAL: The Share button might be at the bottom OR top-right - check both locations.
+                CRITICAL: If the Share button is not visible, scroll to reveal it - it's essential for publishing.
                 CRITICAL: Wait for the screen to change or show confirmation before considering the post done.
                 
                 After posting:
@@ -262,6 +281,12 @@ class InstagramAgent(BasePlatformAgent):
                 media_str = f"Media URLs: {', '.join(all_media)}" if all_media else "No external media"
                 
                 goal = f"""
+                ⚠️ CRITICAL: FOCUS ONLY ON INSTAGRAM - DO NOT OPEN ANY OTHER PLATFORMS
+                - You are ONLY posting to Instagram right now
+                - DO NOT open Twitter/X, Threads, LinkedIn, or any other social media apps
+                - Complete this Instagram task FULLY before finishing
+                - Return to home screen ONLY after Instagram posting is complete
+                
                 Post to Instagram:
                 
                 INSTAGRAM COMPOSER LAYOUT:
@@ -278,16 +303,29 @@ class InstagramAgent(BasePlatformAgent):
                 5. Call get_post_text() to retrieve the caption ({len(full_caption)} characters)
                 6. Store the returned text: caption_content = get_post_text()
                 7. Type the ENTIRE caption into the caption field
-                8. After typing the caption, look for the "Share" button
-                9) IMPORTANT: The Share button is located at the BOTTOM of the screen (not top-right)
-                10) Tap the Share button at the BOTTOM
-                11) Wait for confirmation that the post was published - the screen should change (e.g., return to feed or show success message)
-                12) Verify the post is done by checking if the screen changed or if you see a success confirmation
-                13) Return success status only after confirming the post was published
+                8. After typing the caption, you MUST find and tap the "Share" button to publish
+                9. CRITICAL: Finding the Share button - check these locations in order:
+                   a) Look at the BOTTOM of the screen first - there may be a "Share" button in the bottom toolbar
+                   b) Look at the TOP-RIGHT corner - there may be a "Share" or "Post" button
+                   c) Scroll down slightly if the button is hidden - sometimes the Share button is below the visible area
+                   d) Look for any button that says "Share", "Post", "Publish", or has a share icon (arrow pointing right/up)
+                   e) The Share button might be in a fixed position at the bottom, even if you need to scroll to see it
+                10. Once you find the Share button, tap it immediately
+                11. CRITICAL: If you cannot find the Share button:
+                   - Try scrolling the screen up or down to reveal hidden buttons
+                   - Look for any button with text like "Share", "Post", "Next", or "Done"
+                   - Check if there's a button at the very bottom edge of the screen
+                   - The Share button is ESSENTIAL - you MUST find and tap it to publish
+                12. After tapping Share, wait for confirmation that the post was published
+                13. The screen should change (e.g., return to feed, show "Your post has been shared", or show the post in your profile)
+                14. Verify the post is done by checking if the screen changed or if you see a success confirmation
+                15. Return success status only after confirming the post was published
 
                 CRITICAL: The get_post_text() tool returns the ACTUAL caption from the system.
                 You MUST use that exact text - do NOT generate your own caption.
-                CRITICAL: After writing the description, you MUST tap the Share button at the BOTTOM of the screen.
+                CRITICAL: After writing the description, you MUST find and tap the Share button - this is REQUIRED to publish.
+                CRITICAL: The Share button might be at the bottom OR top-right - check both locations.
+                CRITICAL: If the Share button is not visible, scroll to reveal it - it's essential for publishing.
                 CRITICAL: Wait for the screen to change or show confirmation before considering the post done.
                 
                 Return success status and any confirmation info.

@@ -219,6 +219,12 @@ class TwitterAgent(BasePlatformAgent):
                     media_instruction = media_source_instructions.strip()
                     
                     goal = f"""
+                    ⚠️ CRITICAL: FOCUS ONLY ON X (TWITTER) - DO NOT OPEN ANY OTHER PLATFORMS
+                    - You are ONLY posting to X (Twitter) right now
+                    - DO NOT open Threads, Instagram, LinkedIn, or any other social media apps
+                    - Complete this X (Twitter) task FULLY before finishing
+                    - Return to home screen ONLY after X (Twitter) posting is complete
+                    
                     Create an X (Twitter) post using media collected FIRST, then add text (Tweet {chunk_num}/{total_chunks}).
 
                     X (TWITTER) COMPOSER LAYOUT:
@@ -296,6 +302,12 @@ class TwitterAgent(BasePlatformAgent):
                     if chunk_idx == 0:
                         # First tweet without media
                         goal = f"""
+                        ⚠️ CRITICAL: FOCUS ONLY ON X (TWITTER) - DO NOT OPEN ANY OTHER PLATFORMS
+                        - You are ONLY posting to X (Twitter) right now
+                        - DO NOT open Threads, Instagram, LinkedIn, or any other social media apps
+                        - Complete this X (Twitter) task FULLY before finishing
+                        - Return to home screen ONLY after X (Twitter) posting is complete
+                        
                         Post to X (Twitter) (Tweet {chunk_num}/{total_chunks}):
                         
                         X COMPOSER LAYOUT:
@@ -328,22 +340,50 @@ class TwitterAgent(BasePlatformAgent):
                     else:
                         # Reply/continuation tweet
                         goal = f"""
-                        Reply to the previous tweet with the next part of the thread (Tweet {chunk_num}/{total_chunks}):
+                        ⚠️ CRITICAL: FOCUS ONLY ON X (TWITTER) - DO NOT OPEN ANY OTHER PLATFORMS
+                        - You are ONLY posting to X (Twitter) right now
+                        - DO NOT open Threads, Instagram, LinkedIn, or any other social media apps
+                        - Complete this X (Twitter) task FULLY before finishing
+                        - Return to home screen ONLY after X (Twitter) posting is complete
                         
-                        X REPLY COMPOSER LAYOUT:
-                        - Reply button: Located on the previous tweet (usually bottom-left area)
-                        - Text input: Top of reply composer
-                        - Attachment icons: Media | GIF | Poll | Emoji | Schedule (below text)
-                        - Reply button: Top-right (says "Reply")
+                        Reply to YOUR OWN previous tweet with the next part of the thread (Tweet {chunk_num}/{total_chunks}):
                         
-                        1. Look for a "Reply" button or similar option on the last posted tweet
-                        2. Tap to open the reply composer
-                        3. Call get_post_text() to retrieve the tweet content for this chunk ({len(chunk_text)} characters)
-                        4. Store the returned text: tweet_content = get_post_text()
-                        5. Type the ENTIRE returned text into the reply composer
-                        6. Look for and tap the "Reply" or "Post" button
-                        7. Wait for confirmation that the reply was published
-                        8. Return success status.
+                        CRITICAL: You MUST reply to YOUR OWN tweet, not someone else's tweet!
+                        
+                        X PROFILE AND REPLY LAYOUT:
+                        - Profile button: Bottom navigation (usually Profile icon or your avatar)
+                        - Your tweets: Shown in chronological order (most recent at top)
+                        - Reply button: Located on YOUR tweet (usually bottom-left area of the tweet)
+                        - Reply composer: Text input at top, Reply button at top-right
+                        
+                        STEP-BY-STEP PROCESS:
+                        1. Go to YOUR PROFILE in X (Twitter):
+                           - Tap your profile icon/avatar (usually bottom-right or in navigation)
+                           - OR tap "Profile" in the bottom navigation
+                           - Wait for your profile to load
+                        2. Find YOUR MOST RECENT tweet (the one you just posted):
+                           - Look at the TOP of your profile feed
+                           - The MOST RECENT tweet is the FIRST one shown
+                           - READ the tweet text to verify it matches the previous chunk you posted
+                           - CRITICAL: Only reply to YOUR OWN tweet that you just posted
+                        3. On YOUR tweet, look for the "Reply" button:
+                           - Usually located at the bottom-left area of YOUR tweet
+                           - May show as a reply icon (speech bubble) or "Reply" text
+                           - CRITICAL: Make sure you're clicking Reply on YOUR tweet, not someone else's
+                        4. Tap the Reply button on YOUR tweet to open the reply composer
+                        5. Call get_post_text() to retrieve the tweet content for this chunk ({len(chunk_text)} characters)
+                        6. Store the returned text: tweet_content = get_post_text()
+                        7. Type the ENTIRE returned text into the reply composer
+                        8. Look for and tap the "Reply" or "Post" button (usually top-right)
+                        9. Wait for confirmation that the reply was published
+                        10. Return success status.
+                        
+                        CRITICAL RULES:
+                        - ALWAYS go to YOUR PROFILE first
+                        - ALWAYS reply to YOUR MOST RECENT tweet
+                        - DO NOT reply to someone else's tweet
+                        - VERIFY the tweet text matches what you posted before replying
+                        - If you can't find your tweet, scroll up on your profile to see the most recent ones
 
                         CRITICAL: The get_post_text() tool returns the ACTUAL tweet for this chunk.
                         You MUST use that exact text - do NOT generate your own text.

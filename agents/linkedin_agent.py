@@ -175,6 +175,12 @@ class LinkedInAgent(BasePlatformAgent):
             # This applies regardless of whether media_source_instructions are provided
             
             goal = f"""
+            ⚠️ CRITICAL: FOCUS ONLY ON LINKEDIN - DO NOT OPEN ANY OTHER PLATFORMS
+            - You are ONLY posting to LinkedIn right now
+            - DO NOT open Twitter/X, Threads, Instagram, or any other social media apps
+            - Complete this LinkedIn task FULLY before finishing
+            - Return to home screen ONLY after LinkedIn posting is complete
+            
             Post to LinkedIn - Open LinkedIn app directly, NO Google Photos:
             
             LINKEDIN APP LAYOUT:

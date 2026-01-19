@@ -453,7 +453,7 @@ def post_content():
             emit_log(f'📱 Media instructions: {media_source_instructions}', 'step')
         
         current_step = 2
-        for platform in platforms:
+        for platform_idx, platform in enumerate(platforms, 1):
             # CRITICAL: Triple-check platform is in agents_map and was selected
             if platform not in agents_map:
                 emit_log(f'❌ CRITICAL ERROR: Platform {platform} not in agents_map, ABORTING', 'error')
@@ -465,19 +465,26 @@ def post_content():
                 emit_log(f'❌ CRITICAL ERROR: Platform {platform} not in selected platforms, ABORTING', 'error')
                 continue
             
+            # CRITICAL: Sequential processing - wait for previous platform to complete
+            if platform_idx > 1:
+                emit_log(f'⏸️  Waiting for previous platform to complete before starting {platform.upper()}...', 'info')
+                emit_log(f'🔄 Sequential mode: Processing platforms ONE BY ONE', 'step')
+            
             # Log which platform we're about to post to
-            emit_log(f'🚀 Starting posting to {platform.upper()} (step {current_step-1}/{len(platforms)})', 'step')
+            emit_log(f'🚀 [{platform_idx}/{len(platforms)}] Starting posting to {platform.upper()}', 'step')
             emit_log(f'✅ Platform {platform.upper()} confirmed as SELECTED - proceeding', 'info')
+            emit_log(f'🔒 CRITICAL: Will NOT open any other platform until {platform.upper()} is COMPLETE', 'step')
             
             try:
                 # Emit progress for this platform
                 emit_progress(
                     current_step, 
                     total_steps, 
-                    f'📱 Posting to {platform.upper()}',
-                    f'Initializing {platform} agent...'
+                    f'📱 Posting to {platform.upper()} ({platform_idx}/{len(platforms)})',
+                    f'Processing {platform.upper()} - DO NOT open other platforms until this completes'
                 )
                 emit_log(f'📱 Starting {platform.upper()} agent...', 'step')
+                emit_log(f'⏳ Waiting for {platform.upper()} to complete before moving to next platform...', 'info')
                 
                 # Run async posting in thread to avoid event loop issues
                 # CRITICAL: Pass media_source_instructions in context so ThreadsAgent gets it
@@ -494,16 +501,26 @@ def post_content():
                 
                 try:
                     import concurrent.futures
+                    import time
+                    # CRITICAL: Sequential execution - wait for this platform to complete before continuing
                     with concurrent.futures.ThreadPoolExecutor() as executor:
                         future = executor.submit(run_agent_with_logging)
+                        # Wait for completion - this blocks until the platform finishes
                         result = future.result(timeout=420)  # 7 mins for device automation with media handling
+                    
+                    # CRITICAL: Explicit confirmation that this platform is complete
+                    emit_log(f'✅ {platform.upper()} task COMPLETED', 'success')
+                    emit_log(f'🔄 Ready to proceed to next platform (if any)', 'info')
+                    
                 except concurrent.futures.TimeoutError:
                     result = None
-                    emit_log(f'Timeout posting to {platform.upper()} after 420s', 'error')
+                    emit_log(f'⏱️  Timeout posting to {platform.upper()} after 420s', 'error')
+                    emit_log(f'⚠️  {platform.upper()} did not complete - moving to next platform', 'warning')
                     raise
                 except Exception as e:
                     result = None
-                    emit_log(f'💥 Exception: {str(e)}', 'error')
+                    emit_log(f'💥 Exception in {platform.upper()}: {str(e)}', 'error')
+                    emit_log(f'⚠️  {platform.upper()} failed - moving to next platform', 'warning')
                     raise e
                 
                 # Update progress with result
@@ -523,6 +540,14 @@ def post_content():
                         'reason': result.reason,
                         'error': result.error
                     })
+                
+                # CRITICAL: Add delay between platforms to ensure clean separation
+                if platform_idx < len(platforms):
+                    emit_log(f'⏸️  Waiting 3 seconds before starting next platform...', 'info')
+                    import time
+                    time.sleep(3)
+                    emit_log(f'✅ Ready to start next platform', 'info')
+                    
             except Exception as e:
                 emit_log(f'❌ {platform.upper()} failed: {str(e)}', 'error')
                 formatted_results.append({
@@ -531,6 +556,11 @@ def post_content():
                     'reason': 'Error during posting',
                     'error': str(e)
                 })
+                # Even on error, add delay before next platform
+                if platform_idx < len(platforms):
+                    emit_log(f'⏸️  Waiting 3 seconds before starting next platform...', 'info')
+                    import time
+                    time.sleep(3)
             finally:
                 current_step += 1
         

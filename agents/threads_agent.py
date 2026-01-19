@@ -240,6 +240,12 @@ class ThreadsAgent(BasePlatformAgent):
                     media_instruction = media_source_instructions.strip()
                     
                     goal = f"""
+                    ⚠️ CRITICAL: FOCUS ONLY ON THREADS - DO NOT OPEN ANY OTHER PLATFORMS
+                    - You are ONLY posting to Threads right now
+                    - DO NOT open Twitter/X, Instagram, LinkedIn, or any other social media apps
+                    - Complete this Threads task FULLY before finishing
+                    - Return to home screen ONLY after Threads posting is complete
+                    
                     Create a Threads post using media collected FIRST, then add text (Part {chunk_num}/{total_chunks}).
 
                     THREADS APP LAYOUT:
@@ -315,6 +321,12 @@ class ThreadsAgent(BasePlatformAgent):
                     if chunk_idx == 0:
                         # First chunk without media
                         goal = f"""
+                        ⚠️ CRITICAL: FOCUS ONLY ON THREADS - DO NOT OPEN ANY OTHER PLATFORMS
+                        - You are ONLY posting to Threads right now
+                        - DO NOT open Twitter/X, Instagram, LinkedIn, or any other social media apps
+                        - Complete this Threads task FULLY before finishing
+                        - Return to home screen ONLY after Threads posting is complete
+                        
                         Post to Threads (Part {chunk_num}/{total_chunks}):
                         1. Open the Threads app
                         2. Tap the compose icon to create a new post
@@ -339,6 +351,12 @@ class ThreadsAgent(BasePlatformAgent):
                     else:
                         # Reply/continuation chunk
                         goal = f"""
+                        ⚠️ CRITICAL: FOCUS ONLY ON THREADS - DO NOT OPEN ANY OTHER PLATFORMS
+                        - You are ONLY posting to Threads right now
+                        - DO NOT open Twitter/X, Instagram, LinkedIn, or any other social media apps
+                        - Complete this Threads task FULLY before finishing
+                        - Return to home screen ONLY after Threads posting is complete
+                        
                         Reply to the previous Threads post with the next part of the thread (Part {chunk_num}/{total_chunks}):
                         
                         THREADS COMPOSER LAYOUT:
