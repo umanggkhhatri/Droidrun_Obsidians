@@ -9,8 +9,6 @@ import json
 import yaml
 import asyncio
 import queue
-import threading
-import concurrent.futures
 from pathlib import Path
 from flask import Flask, render_template, request, jsonify, Response
 from werkzeug.utils import secure_filename
@@ -29,7 +27,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 from droidrun import DroidrunConfig
 from config.settings import get_config
 from core.models import Content
-from agents import ThreadsAgent
+from agents import ThreadsAgent, InstagramAgent, TwitterAgent, LinkedInAgent
 from core.link_crawler import LinkCrawler, extract_urls_from_text
 from core.base_agent import set_log_callback
 from core.content_transformer import transform_content_with_llm
@@ -84,6 +82,22 @@ try:
     droidrun_config = DroidrunConfig.from_yaml(config_path)
     print(f"✅ DroidrunConfig initialized with max_steps: {max_steps}")
     print(f"   Agent config: {droidrun_config_data.get('agent', {})}")
+    # Ensure vision is enabled so the agent can analyze screenshots/images
+        # Vision flags enabling code removed to revert vision usage
+    
+        # The following lines were removed:
+        # try:
+        #     if hasattr(droidrun_config, 'agent'):
+        #         agent_cfg = getattr(droidrun_config, 'agent')
+        #         if hasattr(agent_cfg, 'codeact') and hasattr(agent_cfg.codeact, 'vision'):
+        #             agent_cfg.codeact.vision = True
+        #         if hasattr(agent_cfg, 'manager') and hasattr(agent_cfg.manager, 'vision'):
+        #             agent_cfg.manager.vision = True
+        #         if hasattr(agent_cfg, 'executor') and hasattr(agent_cfg.executor, 'vision'):
+        #             agent_cfg.executor.vision = True
+        #     print("✅ Vision mode enabled for DroidRun (codeact/manager/executor)")
+        # except Exception as ve:
+        #     print(f"⚠️  Could not enable vision flags programmatically: {ve}")
 except TypeError:
     # If DroidrunConfig doesn't accept kwargs, try creating it normally
     # but set max_steps attribute directly
@@ -128,6 +142,14 @@ progress_queue = queue.Queue()
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'mp4', 'mov', 'webm'}
 
 
+def _strip_emoji(text: str) -> str:
+    """Remove emojis and non-ASCII characters for cleaner UI logs."""
+    try:
+        return (text or "").encode('ascii', 'ignore').decode()
+    except Exception:
+        return text or ""
+
+
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
@@ -137,10 +159,10 @@ def emit_progress(step, total, message, details='', log=None, log_type='info'):
     progress_queue.put({
         'step': step,
         'total': total,
-        'message': message,
-        'details': details,
+        'message': _strip_emoji(message),
+        'details': _strip_emoji(details),
         'percentage': int((step / total) * 100) if total > 0 else 0,
-        'log': log,
+        'log': _strip_emoji(log) if isinstance(log, str) else log,
         'logType': log_type
     })
 
@@ -149,7 +171,7 @@ def emit_log(message, log_type='info'):
     """Emit a log-only update to the queue"""
     progress_queue.put({
         'type': 'log',
-        'log': message,
+        'log': _strip_emoji(message),
         'logType': log_type
     })
 
@@ -271,20 +293,26 @@ def post_content():
             combined_content += f"\n\nCRAWLED LINK CONTENT:{crawled_content}"
             emit_log(f'📋 Combined content: {len(combined_content)} total chars', 'info')
         
-        # === STEP 3: TRANSFORM COMBINED CONTENT WITH LLM ===
+        # === STEP 3: TRANSFORM COMBINED CONTENT WITH LLM (PLATFORM-SPECIFIC) ===
         if combined_content and len(combined_content) > 10:
             try:
-                emit_log(f'📝 Transforming combined content ({len(combined_content)} chars)...', 'step')
+                # Transform content separately for each platform for better results
+                emit_log(f'📝 Transforming content for {len(platforms)} platforms ({len(combined_content)} chars)...', 'step')
                 emit_log(f'📋 Input preview: {combined_content[:300]}...', 'info')
+                
+                # For now, transform once with general platform or first selected platform
+                # TODO: Consider transforming separately per platform in future
+                primary_platform = platforms[0] if platforms else "general"
+                emit_log(f'🎨 Using {primary_platform} tone and style', 'info')
                 
                 # Run async transformation in thread to avoid event loop issues
                 import concurrent.futures
                 with concurrent.futures.ThreadPoolExecutor() as executor:
                     future = executor.submit(
                         asyncio.run,
-                        transform_content_with_llm(combined_content, droidrun_config)
+                        transform_content_with_llm(combined_content, droidrun_config, platform=primary_platform)
                     )
-                    transformed_text = future.result(timeout=60)  # 60s timeout for larger content
+                    transformed_text = future.result(timeout=90)  # 90s timeout for larger content with crawling
                 
                 if transformed_text and len(transformed_text) > 20:
                     emit_log(f'✨ TRANSFORMED TEXT ({len(transformed_text)} chars):', 'success')
@@ -334,16 +362,22 @@ def post_content():
                 'message': 'Droidrun config not loaded. Ensure ~/.droidrun/config.yaml exists'
             }), 500
         
-        # Initialize Threads agent only (120s timeout for device automation)
-        threads_agent = ThreadsAgent(droidrun_config, timeout=120)
+        # Initialize agents for all platforms (400s timeout for device automation with media handling)
+        threads_agent = ThreadsAgent(droidrun_config, timeout=400)
+        instagram_agent = InstagramAgent(droidrun_config, timeout=400)
+        twitter_agent = TwitterAgent(droidrun_config, timeout=400)
+        linkedin_agent = LinkedInAgent(droidrun_config, timeout=400)
         
-        # Map platforms to agents (only Threads)
+        # Map platforms to agents
         agents_map = {
             'threads': threads_agent,
+            'instagram': instagram_agent,
+            'twitter': twitter_agent,
+            'linkedin': linkedin_agent,
         }
         
-        # Filter to only allow Threads platform
-        platforms = ['threads']
+        # Filter to only requested platforms that are available
+        platforms = [p for p in platforms if p in agents_map]
         
         # Post to each platform with progress updates
         formatted_results = []
@@ -391,7 +425,11 @@ def post_content():
                     import concurrent.futures
                     with concurrent.futures.ThreadPoolExecutor() as executor:
                         future = executor.submit(run_agent_with_logging)
-                        result = future.result(timeout=120)  # 2 mins for device automation
+                        result = future.result(timeout=420)  # 7 mins for device automation with media handling
+                except concurrent.futures.TimeoutError:
+                    result = None
+                    emit_log(f'Timeout posting to {platform.upper()} after 420s', 'error')
+                    raise
                 except Exception as e:
                     result = None
                     emit_log(f'💥 Exception: {str(e)}', 'error')

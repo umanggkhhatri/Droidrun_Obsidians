@@ -16,6 +16,7 @@ const postBtn = document.getElementById("postBtn");
 const clearBtn = document.getElementById("clearBtn");
 const resultsSection = document.getElementById("resultsSection");
 const resultsList = document.getElementById("resultsList");
+const platformCount = document.getElementById("platformCount");
 
 // Terminal Elements
 const terminalLog = document.getElementById("terminalLog");
@@ -57,6 +58,23 @@ function handleClear() {
   resultsSection.classList.add("hidden");
 }
 
+function updatePlatformCount() {
+  const count = getSelectedPlatforms().length;
+  platformCount.textContent = count;
+
+  // Update button text
+  if (count === 0) {
+    postBtn.textContent = "Select a Platform";
+    postBtn.disabled = true;
+  } else if (count === 1) {
+    postBtn.innerHTML = "Post Now";
+    postBtn.disabled = false;
+  } else {
+    postBtn.innerHTML = `Post to ${count} Platforms`;
+    postBtn.disabled = false;
+  }
+}
+
 async function handlePost() {
   // Validation
   if (
@@ -79,7 +97,8 @@ async function handlePost() {
   // Clear previous logs and show running state
   clearTerminalLog();
   setRunningState(true);
-  appendToTerminalLog("🚀 Starting post workflow...", "step");
+  appendToTerminalLog("Starting post workflow...", "step");
+  appendToTerminalLog(`Platforms: ${selectedPlatforms.join(", ")}`, "info");
 
   // Connect to progress stream BEFORE making the request
   connectProgressStream();
@@ -91,7 +110,7 @@ async function handlePost() {
     formData.append("links", state.links);
     formData.append("platforms", JSON.stringify(selectedPlatforms));
 
-    appendToTerminalLog("📤 Sending request to server...", "info");
+    appendToTerminalLog("Sending request to server...", "info");
 
     const response = await fetch("/api/post", {
       method: "POST",
@@ -101,16 +120,16 @@ async function handlePost() {
     const data = await response.json();
 
     if (data.success) {
-      appendToTerminalLog("✅ Post completed successfully!", "success");
+      appendToTerminalLog("Post completed successfully!", "success");
       displayResults(data.results);
       handleClear();
     } else {
-      appendToTerminalLog("❌ Error: " + data.message, "error");
+      appendToTerminalLog("Error: " + data.message, "error");
       alert("Error: " + data.message);
     }
   } catch (error) {
     console.error("Error:", error);
-    appendToTerminalLog("💥 Error: " + error.message, "error");
+    appendToTerminalLog("Error: " + error.message, "error");
     alert("Error posting content: " + error.message);
   } finally {
     setRunningState(false);
@@ -184,13 +203,16 @@ function setRunningState(running) {
   if (running) {
     statusIndicator.textContent = "● Running";
     statusIndicator.classList.add("running");
+    statusIndicator.classList.remove("idle");
     progressInline.classList.remove("hidden");
     progressFillInline.style.width = "0%";
     progressTextInline.textContent = "0%";
   } else {
     statusIndicator.textContent = "● Idle";
     statusIndicator.classList.remove("running");
+    statusIndicator.classList.add("idle");
     progressInline.classList.add("hidden");
+    updatePlatformCount(); // Restore button state
   }
 }
 
@@ -221,7 +243,7 @@ function displayResults(results) {
     const resultItem = document.createElement("div");
     resultItem.className = `result-item ${result.success ? "success" : "error"}`;
 
-    const icon = result.success ? "✓" : "✕";
+    const icon = result.success ? "Success" : "Failed";
     const platformName =
       result.platform.charAt(0).toUpperCase() + result.platform.slice(1);
     const message = result.reason || result.error || "Unknown error";
@@ -246,6 +268,10 @@ document.addEventListener("DOMContentLoaded", () => {
   checkboxes.forEach((cb) => {
     cb.addEventListener("change", () => {
       state.platforms = getSelectedPlatforms();
+      updatePlatformCount();
     });
   });
+
+  // Initial count
+  updatePlatformCount();
 });

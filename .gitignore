@@ -80,3 +80,6 @@ droidrun_config.yaml
 *.key
 secrets/
 credentials/
+
+# Agent context (contains project-specific details)
+AGENT_CONTEXT.md

@@ -22,11 +22,11 @@ class InstagramAgent(BasePlatformAgent):
     - Flashy design and visual appeal
     - Use cases and practical benefits
     - Engaging captions with emojis
-    - Hashtag optimization
+    - Hashtag optimization (up to 30)
     - Carousel slide ideas for multi-image posts
     """
 
-    def __init__(self, config: DroidrunConfig, timeout: int = 60):
+    def __init__(self, config: DroidrunConfig, timeout: int = 400):
         """Initialize Instagram agent"""
         super().__init__(config, "instagram", timeout)
         self.caption_max_length = 2200
@@ -42,7 +42,7 @@ class InstagramAgent(BasePlatformAgent):
         Prepare flashy Instagram content with captions, hashtags, and emojis
         
         Args:
-            content: Original content text
+            content: Original content text or dict with text/media
             context: Crawled context data
             **kwargs: Additional arguments (unused)
         
@@ -50,18 +50,56 @@ class InstagramAgent(BasePlatformAgent):
             Dictionary with Instagram-specific content or None if failed
         """
         try:
-            # Create comprehensive context string
-            context_str = self._prepare_context_string(content, context)
+            # Check for media_source_instructions FIRST
+            media_instructions = context.get("media_source_instructions", "")
+            if not media_instructions and isinstance(content, dict):
+                media_instructions = content.get("media_source_instructions", "")
             
-            # Prepare prompt for content generation
+            # If media instructions exist, use simple text preparation (NO device agent)
+            # This prevents the agent from opening any apps before media collection
+            if media_instructions:
+                logger.info(f"Media instructions detected - using simple text prep (no device interaction)")
+                logger.info(f"Media instructions: {media_instructions[:80]}...")
+                
+                # Extract user's text directly - don't run device agent
+                if isinstance(content, dict):
+                    user_text = content.get("text", "")
+                else:
+                    user_text = str(content) if content else ""
+                
+                # Log the text we received
+                logger.info(f"📝 Received text for posting ({len(user_text)} chars): {user_text[:150]}...")
+                
+                # If user provided text, use it; otherwise use a simple fallback
+                if user_text and len(user_text.strip()) > 10:
+                    final_text = user_text.strip()
+                    if len(final_text) > self.caption_max_length - 200:  # Reserve space for hashtags
+                        final_text = truncate_text(final_text, self.caption_max_length - 200)
+                    
+                    prepared = {
+                        "caption": final_text,
+                        "hashtags": self._generate_default_hashtags(),
+                        "emojis": "✨🚀📸",
+                        "carousel_ideas": [],
+                        "media_source_instructions": media_instructions
+                    }
+                    logger.info(f"✅ Prepared caption for posting ({len(final_text)} chars)")
+                else:
+                    # Minimal fallback - let the media speak for itself
+                    prepared = self._fallback_prepare_content(content, context)
+                    prepared["media_source_instructions"] = media_instructions
+                
+                logger.info("Content prepared (simple mode) - ready for media-first posting")
+                return prepared
+            
+            # No media instructions - use full agent-based content generation
+            context_str = self._prepare_context_string(content, context)
             prompt = self._create_preparation_prompt(context_str)
             
-            # Run agent to prepare content
             result = await self._run_droidrun_agent(prompt)
 
             prepared: Dict[str, Any] = {}
             if result["success"]:
-                # Try to parse response
                 prepared = self._extract_json_response(result["observation"]) or {}
 
             # Validate and fallback if needed
@@ -76,10 +114,10 @@ class InstagramAgent(BasePlatformAgent):
                 tag if tag.startswith("#") else f"#{tag}"
                 for tag in prepared["hashtags"][: self.hashtag_count]
             ]
-            prepared.setdefault("emojis", "")
+            prepared.setdefault("emojis", "✨🚀📸")
             prepared.setdefault("carousel_ideas", [])
 
-            logger.info("Instagram content prepared successfully (with fallback if needed)")
+            logger.info("Instagram content prepared successfully")
             return prepared
         
         except Exception as e:
@@ -105,30 +143,139 @@ class InstagramAgent(BasePlatformAgent):
             caption = prepared_content.get("caption", "")
             hashtags = prepared_content.get("hashtags", [])
             emojis = prepared_content.get("emojis", "")
-            carousel_ideas = prepared_content.get("carousel_ideas", [])
+            video_urls = prepared_content.get("videos", [])
+            media_source_instructions = prepared_content.get("media_source_instructions", "")
             
-            # Build full caption with hashtags and emojis
-            full_caption = f"{caption}\n\n{emojis}\n\n" + " ".join(hashtags)
+            # Build full caption with emojis and hashtags
+            full_caption = caption
+            if emojis:
+                full_caption = f"{full_caption}\n\n{emojis}"
+            if hashtags:
+                full_caption = f"{full_caption}\n\n" + " ".join(hashtags)
+            
             full_caption = truncate_text(full_caption, self.caption_max_length)
             
-            # Create goal for posting
-            media_str = f"Media URLs: {', '.join(media_urls)}" if media_urls else "No media"
-            carousel_str = f"Carousel ideas: {json.dumps(carousel_ideas)}" if carousel_ideas else ""
+            # Log the exact text being sent to the agent
+            logger.info(f"🎯 POSTING CAPTION TO INSTAGRAM ({len(full_caption)} chars):")
+            logger.info(f"📝 {full_caption[:200]}...")
             
-            goal = f"""
-            Post to Instagram:
-            1. Open Instagram app
-            2. Click on "Create" button (+ icon)
-            3. Select photos/videos from: {media_str}
-            4. {f"Use carousel format with these ideas: {carousel_str}" if carousel_str else ""}
-            5. Add caption: {full_caption}
-            6. Click "Share" to publish
+            all_media = list(set((media_urls or []) + (video_urls or [])))
             
-            Return success status and any post ID or error information.
-            """
+            # Pass caption as variable (not embedded in goal string)
+            agent_variables = {
+                "post_text": full_caption,
+            }
             
-            # Execute posting
-            result = await self._run_droidrun_agent(goal)
+            if media_source_instructions:
+                # Media path provided: enforce media-first via share sheet
+                media_instruction = media_source_instructions.strip()
+                
+                goal = f"""
+                Create an Instagram post using media collected FIRST, then add text.
+
+                INSTAGRAM COMPOSER LAYOUT:
+                - CREATE button: TOP-LEFT corner of screen (plus icon)
+                - After media selection: Caption input (top)
+                - Attachment options (below caption): Location tag | Tag people | Accessibility | Advanced settings
+                - Share button: Top-right corner (says "Share")
+                - Bottom nav: Home | Reels | Messages (center) | Search | Profile
+
+                INSTAGRAM APP LAYOUT:
+                - Top bar: CREATE/+ (top-left) | Logo (center) | Notifications (top-right)
+                - Bottom nav: Home | Reels | Messages (center) | Search | Profile
+                - Create button: TOP-LEFT corner of screen (plus icon)
+                - Share sheet: Look for "instagram ▾" dropdown - choose Feed/Reels/Stories as appropriate
+
+                GOOGLE PHOTOS LAYOUT (when browsing for media):
+                - Top-left: Google Photos logo
+                - Top-right (3 icons, right to left): Profile | Notifications | New (plus icon)
+                - New button options: Create album | Collage | Highlight video | Cinematic | Animation | More
+                - Bottom panel (4 buttons): Photos | Collections | Create | Search
+                - CRITICAL: SCROLL TO THE TOP in Photos tab first before looking for the media
+                - Photos tab shows: Media sorted by month
+                - Collections tab shows: People faces | Albums | Documents | App-wise media
+
+                Media collection (priority):
+                1) Follow these EXACT instructions to locate/select media on device: {media_instruction}
+                1a) CRITICAL: If opening Google Photos or any gallery app, SCROLL TO THE TOP first before looking for the media
+                1b) ⭐ IMPORTANT USEFUL METHOD - TRY THIS FIRST: In Google Photos, select ONE media first, then SCROLL to find more media and tap them to add to selection
+                   * STEP-BY-STEP PROCESS:
+                     1. Select the FIRST media item
+                     2. Verify it's selected (check for selection indicator)
+                     3. SCROLL from the MIDDLE OF THE SCREEN to find the NEXT media item
+                        - Scroll the media grid UPWARDS (swipe from bottom area towards top)
+                        - Start scroll gesture a little UPWARDS from the bottom of visible screen to avoid overlay issues
+                     4. Tap to add it to selection
+                     5. Repeat steps 3-4 for each additional media
+                   * CRITICAL: Always scroll from the middle/center of the screen, NOT from edges
+                   * This is the MOST RELIABLE way to select multiple images
+                   * Don't try to select all at once - do it ONE BY ONE in sequence
+                   * ALWAYS attempt this method BEFORE trying any fallback approaches
+                1c) MEDIA SELECTION STRATEGY:
+                   - Image ordering in Photos and in-app "Add media" is NOT trustworthy - they may show different orders
+                   - CRITICAL: You CANNOT select media separately and share them one by one to posting apps - must select all together
+                   - CRITICAL: NEVER use Instagram's in-app media picker/gallery - it shows media from all sources in wrong order
+                   - ALWAYS use Google Photos via share sheet - this ensures correct media selection
+                                     - If the scroll method above fails, try these alternative approaches:
+                     * Select one image, then swipe up or down, then tap another image to add it to selection
+                     * Try using the collection/album view if direct media browsing fails
+                     * Try selecting from different tabs (Photos tab vs Collections tab)
+                     * If a specific image won't select, try selecting adjacent images first, then deselect and reselect
+                2) IMPORTANT: After selecting media, if you cannot find the share button or it's hidden behind a banner/overlay:
+                   - Try swiping up slightly to reveal hidden UI elements
+                   - Try tapping on empty space to dismiss any overlays or popups
+                   - Look for share icons in corners or bottom of screen
+                   - If needed, long-press on the media to get context menu with share option
+                   - Scroll/swipe the thumbnail bar if the selected image seems hidden
+                3) Use the system share sheet to share the selected media to Instagram.
+                   IMPORTANT: There are MULTIPLE Instagram sharing options available in the share sheet:
+                   - DO NOT use "Instagram Messages" or "Instagram Direct" - these are for DMs only
+                   - ALWAYS look for and use "instagram ▾" (with down arrow symbol) option
+                   - This is the correct option that opens the Instagram composer with media attached
+                   - Do NOT use plain "Instagram", "Instagram Feed", "Instagram Reels", or "Instagram Stories" unless "instagram ▾" is not available
+                   - The goal is to open the Instagram composer with the media already attached, NOT to send a message
+
+                Compose in Instagram:
+                4) Call get_post_text() to retrieve the caption ({len(full_caption)} characters)
+                5) Store the returned text in a variable: caption_content = get_post_text()
+                6) Type the ENTIRE returned caption into the caption field using: type(text=caption_content, index=...)
+                7) Tap "Share" or "Post" to publish.
+
+                CRITICAL: The get_post_text() tool returns the ACTUAL caption from the system.
+                You MUST use that exact text - do NOT generate or summarize your own caption.
+                
+                Return success status and any confirmation info.
+                """
+            else:
+                # No media path: open Instagram directly
+                media_str = f"Media URLs: {', '.join(all_media)}" if all_media else "No external media"
+                
+                goal = f"""
+                Post to Instagram:
+                
+                INSTAGRAM COMPOSER LAYOUT:
+                - CREATE button: TOP-LEFT corner of screen (plus/+ icon)
+                - After selecting media: Caption input field (top)
+                - Attachment options (below caption): Location tag | Tag people | Accessibility
+                - Share button: Top-right corner
+                - Bottom navigation: Home | Reels | Messages | Search | Profile
+                
+                1. Open Instagram app (com.instagram.android)
+                2. Tap the CREATE "+" button (TOP-LEFT corner) to start a new post
+                3. Select photos/videos from gallery or: {media_str}
+                4. Proceed to caption screen
+                5. Call get_post_text() to retrieve the caption ({len(full_caption)} characters)
+                6. Store the returned text: caption_content = get_post_text()
+                7. Type the ENTIRE caption into the caption field
+                8. Tap "Share" to publish
+
+                CRITICAL: The get_post_text() tool returns the ACTUAL caption from the system.
+                You MUST use that exact text - do NOT generate your own caption.
+                
+                Return success status and any confirmation info.
+                """
+            
+            result = await self._run_droidrun_agent(goal, variables=agent_variables)
             
             if result["success"]:
                 logger.info("Instagram post successful")
@@ -205,43 +352,46 @@ class InstagramAgent(BasePlatformAgent):
 
         return "\n".join(items)
 
-    def _fallback_prepare_content(self, content: str, context: Dict[str, Any]) -> Dict[str, Any]:
-        """Build a flashy end-user oriented post when LLM prep fails or content is sparse."""
-        # Try to derive a simple project name/slug from a URL
-        project = "this project"
-        emojis = "✨🚀🎯📱💡"
-        default_hashtags = [
-            "#tech", "#innovation", "#product", "#learning", "#buildinpublic",
-            "#devlife", "#software", "#coding", "#app", "#ux", "#maker",
-            "#startup", "#newrelease", "#demo", "#explore", "#discover",
-            "#howitworks", "#productivity", "#design", "#wow"
+    def _generate_default_hashtags(self) -> List[str]:
+        """Generate default hashtags for Instagram"""
+        return [
+            "#instagood", "#photooftheday", "#beautiful", "#happy",
+            "#picoftheday", "#instadaily", "#amazing", "#style",
+            "#life", "#bestoftheday", "#instacool", "#explore"
         ]
 
-        # If content looks like a URL, pull host/last path
+    def _fallback_prepare_content(self, content: str, context: Dict[str, Any]) -> Dict[str, Any]:
+        """Build a flashy end-user oriented post when LLM prep fails or content is sparse."""
+        project = "this"
+        emojis = "✨🚀🎯📱💡"
+
         try:
             if isinstance(content, str) and content.startswith("http"):
                 parsed = urlparse(content)
                 slug = (parsed.path.strip("/") or parsed.netloc).split("/")[-1]
                 if slug:
                     project = slug.replace("-", " ").replace("_", " ")
+            elif isinstance(content, dict):
+                text = content.get("text", "")
+                if text:
+                    project = text[:50]
         except Exception:
             pass
 
         caption = (
-            f"Meet {project} — a quick, fun way to try something new! "
-            f"Swipe to see what it does, how it helps, and why it's awesome for your day. "
-            f"Tap the link to explore more and give it a spin!"
+            f"Just discovered something amazing! {project} ✨\n\n"
+            f"Swipe to see more and let me know what you think in the comments! 👇"
         )
 
         return {
-            "caption": truncate_text(caption, self.caption_max_length),
-            "hashtags": default_hashtags[: self.hashtag_count],
+            "caption": truncate_text(caption, self.caption_max_length - 200),
+            "hashtags": self._generate_default_hashtags(),
             "emojis": emojis,
             "carousel_ideas": [
-                "What it is (1-liner)",
-                "Top 3 benefits",
-                "How it works in 3 steps",
-                "Quick demo/screenshot",
-                "Try it now (CTA)"
+                "What it is",
+                "Key highlights",
+                "Why it matters",
+                "Try it yourself"
             ],
         }
+

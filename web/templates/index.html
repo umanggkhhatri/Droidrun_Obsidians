@@ -10,104 +10,163 @@
     />
   </head>
   <body>
-    <div class="container">
-      <!-- Header -->
-      <header class="header">
-        <h1>🚀 Social Media Automator</h1>
-        <p>Post to all platforms instantly</p>
-      </header>
+    <div class="app">
+      <!-- Sidebar -->
+      <aside class="sidebar">
+        <div class="sidebar-header">
+          <div class="logo"></div>
+          <h1>Automator</h1>
+        </div>
 
-      <!-- Main Content -->
-      <main class="main">
-        <!-- Text Input Section -->
-        <section class="section">
-          <h2>✍️ Write Description</h2>
-          <textarea
-            id="descriptionInput"
-            placeholder="Write your post description (max 5000 characters)..."
-            maxlength="5000"
-            rows="5"
-          ></textarea>
-          <div class="char-count"><span id="charCount">0</span> / 5000</div>
-        </section>
-
-        <!-- Media Source Instructions -->
-        <section class="section">
-          <h2>📱 Media Source (Optional)</h2>
-          <textarea
-            id="mediaSourceInput"
-            placeholder="Instructions for collecting media from device. Examples:
-- Gallery recent 5 images
-- All media between Jan 4 and Jan 6
-- Media from last 2 days
-- WhatsApp chat with +91XXXXXXXXXX (last 10 messages)
-- All videos from gallery
-- Screenshots from today
-
-Leave empty if no media needed."
-            rows="4"
-          ></textarea>
-        </section>
-
-        <!-- Links Section -->
-        <section class="section">
-          <h2>🔗 Add Links</h2>
-          <textarea
-            id="linksInput"
-            placeholder="Paste links (one per line)..."
-            rows="3"
-          ></textarea>
-        </section>
-
-        <!-- Platform Selection -->
-        <section class="section">
-          <h2>📱 Platform</h2>
-          <div class="platform-grid">
-            <label class="platform-option">
+        <div class="platform-section">
+          <h3>Select Platforms</h3>
+          <div class="platform-list">
+            <label class="platform-item">
               <input type="checkbox" name="platform" value="threads" checked />
-              <span class="platform-label">💬 Threads</span>
-              <span class="platform-desc">500 chars</span>
+              <span class="platform-box">
+                <span class="platform-icon"></span>
+                <span class="platform-details">
+                  <span class="platform-name">Threads</span>
+                  <span class="platform-limit">500 chars</span>
+                </span>
+                <span class="platform-checkmark">✓</span>
+              </span>
+            </label>
+
+            <label class="platform-item">
+              <input type="checkbox" name="platform" value="instagram" />
+              <span class="platform-box">
+                <span class="platform-icon"></span>
+                <span class="platform-details">
+                  <span class="platform-name">Instagram</span>
+                  <span class="platform-limit">2200 chars</span>
+                </span>
+                <span class="platform-checkmark">✓</span>
+              </span>
+            </label>
+
+            <label class="platform-item">
+              <input type="checkbox" name="platform" value="twitter" />
+              <span class="platform-box">
+                <span class="platform-icon"></span>
+                <span class="platform-details">
+                  <span class="platform-name">X / Twitter</span>
+                  <span class="platform-limit">280 chars</span>
+                </span>
+                <span class="platform-checkmark">✓</span>
+              </span>
+            </label>
+
+            <label class="platform-item">
+              <input type="checkbox" name="platform" value="linkedin" />
+              <span class="platform-box">
+                <span class="platform-icon"></span>
+                <span class="platform-details">
+                  <span class="platform-name">LinkedIn</span>
+                  <span class="platform-limit">3000 chars</span>
+                </span>
+                <span class="platform-checkmark">✓</span>
+              </span>
             </label>
           </div>
-        </section>
+        </div>
 
-        <!-- Action Buttons -->
-        <section class="section action-buttons">
-          <button id="postBtn" class="btn btn-primary">
-            🚀 Post to Threads
-          </button>
-          <button id="clearBtn" class="btn btn-secondary">🗑️ Clear All</button>
-        </section>
+        <div class="sidebar-footer">
+          <span id="platformCount">1</span> platform selected
+        </div>
+      </aside>
 
-        <!-- Agent Output Section (always visible) -->
-        <section class="section terminal-section">
+      <!-- Main Content -->
+      <main class="main-content">
+        <!-- Compose Card -->
+        <div class="card compose-card">
+          <div class="card-header">
+            <h2>Compose</h2>
+            <button id="clearBtn" class="btn-ghost" title="Clear all">
+              Clear
+            </button>
+          </div>
+
+          <div class="card-body">
+            <div class="form-group">
+              <textarea
+                id="descriptionInput"
+                class="input-main"
+                placeholder="What's on your mind? Write your post here..."
+                maxlength="5000"
+                rows="5"
+              ></textarea>
+              <div class="input-footer">
+                <span class="char-count"
+                  ><span id="charCount">0</span> / 5000</span
+                >
+              </div>
+            </div>
+
+            <details class="expandable">
+              <summary>
+                <span>Media Source</span>
+                <span class="optional-badge">Optional</span>
+              </summary>
+              <textarea
+                id="mediaSourceInput"
+                placeholder="Examples:&#10;• Gallery recent 5 images&#10;• All media between Jan 4 and Jan 6&#10;• WhatsApp chat with +91XXXXXXXXXX&#10;• Screenshots from today"
+                rows="3"
+              ></textarea>
+            </details>
+
+            <details class="expandable">
+              <summary>
+                <span>Add Links</span>
+                <span class="optional-badge">Optional</span>
+              </summary>
+              <textarea
+                id="linksInput"
+                placeholder="Paste links (one per line)..."
+                rows="2"
+              ></textarea>
+            </details>
+          </div>
+
+          <div class="card-footer">
+            <button id="postBtn" class="btn-primary">Post Now</button>
+          </div>
+        </div>
+
+        <!-- Terminal Card -->
+        <div class="card terminal-card">
           <div class="terminal-header">
-            <h2>📟 Agent Output</h2>
-            <div class="terminal-controls">
-              <span id="statusIndicator" class="status-indicator">● Idle</span>
-              <button id="clearLogBtn" class="terminal-clear-btn">Clear</button>
+            <div class="terminal-dots">
+              <span class="dot red"></span>
+              <span class="dot yellow"></span>
+              <span class="dot green"></span>
+              <span class="terminal-title">Agent Output</span>
+            </div>
+            <div class="terminal-actions">
+              <span id="statusIndicator" class="status-badge idle">● Idle</span>
+              <button id="clearLogBtn" class="btn-small">Clear</button>
             </div>
           </div>
-          <div id="terminalLog" class="terminal-log">
+
+          <div id="terminalLog" class="terminal-body">
             <div class="log-info">[Ready] Waiting for task...</div>
           </div>
-          <div class="progress-inline hidden" id="progressInline">
-            <div class="progress-bar-inline">
-              <div
-                id="progressFillInline"
-                class="progress-fill-inline"
-                style="width: 0%"
-              ></div>
+
+          <div class="progress-bar-wrap hidden" id="progressInline">
+            <div class="progress-track">
+              <div id="progressFillInline" class="progress-fill"></div>
             </div>
             <span id="progressTextInline">0%</span>
           </div>
-        </section>
+        </div>
 
-        <!-- Results Section -->
-        <section id="resultsSection" class="section results-section hidden">
-          <h2>📊 Results</h2>
+        <!-- Results Card -->
+        <div id="resultsSection" class="card results-card hidden">
+          <div class="card-header">
+            <h2>Results</h2>
+          </div>
           <div id="resultsList" class="results-list"></div>
-        </section>
+        </div>
       </main>
     </div>
 

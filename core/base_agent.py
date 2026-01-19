@@ -7,6 +7,7 @@ import sys
 import io
 import contextlib
 from contextlib import redirect_stdout, redirect_stderr
+import datetime
 
 from droidrun import DroidAgent, DroidrunConfig
 
@@ -150,8 +151,16 @@ class BasePlatformAgent(ABC):
         """
         try:
             timeout = timeout or self.timeout
-            self.logger.debug(f"Running droidrun agent with goal: {goal[:100]}...")
-            emit_agent_log(f"🚀 Starting agent with goal: {goal[:80]}...", 'step')
+            now_str = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            date_hint = (
+                "\n\nCONTEXT:\n"
+                f"- Today's local date/time: {now_str}\n"
+                "- If dates are unclear, open a media item to view its date/details and compare against today."
+            )
+            enriched_goal = f"{goal.strip()}\n{date_hint}"
+
+            self.logger.debug(f"Running droidrun agent with goal: {enriched_goal[:100]}...")
+            emit_agent_log(f"🚀 Starting agent with goal: {enriched_goal[:80]}...", 'step')
 
             # Build custom tools for accessing variable
             tools_to_use = custom_tools or {}
@@ -177,7 +186,7 @@ class BasePlatformAgent(ABC):
 
             # Instantiate agent per run with explicit goal, variables, and custom tools
             agent = DroidAgent(
-                goal=goal, 
+                goal=enriched_goal, 
                 config=self.config, 
                 variables=variables or {},
                 custom_tools=tools_to_use if tools_to_use else None
@@ -290,28 +299,3 @@ class BasePlatformAgent(ABC):
     def _extract_json_response(self, text: str) -> Dict[str, Any]:
         """Extract JSON from agent response text"""
         return extract_json_from_text(text)
-
-    async def _retry_operation(self, operation, max_retries: int = 3, delay: int = 2):
-        """
-        Retry an async operation with exponential backoff
-        
-        Args:
-            operation: Async callable to retry
-            max_retries: Maximum retry attempts
-            delay: Initial delay between retries in seconds
-        
-        Returns:
-            Result of operation if successful
-        
-        Raises:
-            Exception: If all retries fail
-        """
-        for attempt in range(max_retries):
-            try:
-                return await operation()
-            except Exception as e:
-                if attempt == max_retries - 1:
-                    raise
-                wait_time = delay * (2 ** attempt)  # Exponential backoff
-                self.logger.warning(f"Attempt {attempt + 1} failed. Retrying in {wait_time}s...")
-                await asyncio.sleep(wait_time)
