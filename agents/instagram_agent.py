@@ -26,7 +26,7 @@ class InstagramAgent(BasePlatformAgent):
     - Carousel slide ideas for multi-image posts
     """
 
-    def __init__(self, config: DroidrunConfig, timeout: int = 400):
+    def __init__(self, config: DroidrunConfig, timeout: int = 1500):
         """Initialize Instagram agent"""
         super().__init__(config, "instagram", timeout)
         self.caption_max_length = 2200

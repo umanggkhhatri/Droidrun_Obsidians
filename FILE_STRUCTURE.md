@@ -261,18 +261,6 @@
 
 **Features**: Runnable examples with `asyncio.run()`, clear output
 
-### `testing_utils.py` (250 lines)
-
-**Purpose**: Testing utilities and mock data generators
-
-- `MockContent`: Create sample content
-- `ResultValidator`: Validate posting results
-- `TestDataGenerator`: Generate test scenarios (GitHub, blog, product launch)
-- `DebugReporter`: Print detailed debug info
-- `export_results_to_json()`: Export results for analysis
-
-**Features**: Mock data, validation, debug reporting, result export
-
 ---
 
 ## Configuration Files
@@ -343,9 +331,6 @@ examples.py
 ├── core (all components)
 ├── agents (all agents)
 └── config.settings
-
-testing_utils.py
-└── core.models
 ```
 
 ---

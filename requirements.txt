@@ -1,3 +1,5 @@
 droidrun>=0.1.0
 python-dotenv>=1.0.0
-pydantic>=2.6.0
+flask>=3.0.0
+werkzeug>=3.0.1
+google-generativeai>=0.3.0

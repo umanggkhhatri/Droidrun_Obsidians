@@ -26,7 +26,7 @@ class LinkedInAgent(BasePlatformAgent):
     - Professional hashtags
     """
 
-    def __init__(self, config: DroidrunConfig, timeout: int = 400):
+    def __init__(self, config: DroidrunConfig, timeout: int = 1500):
         """Initialize LinkedIn agent"""
         super().__init__(config, "linkedin", timeout)
         self.post_max_length = 3000

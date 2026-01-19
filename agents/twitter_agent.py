@@ -25,7 +25,7 @@ class TwitterAgent(BasePlatformAgent):
     - Optional short thread for follow-up points
     """
 
-    def __init__(self, config: DroidrunConfig, timeout: int = 400):
+    def __init__(self, config: DroidrunConfig, timeout: int = 1500):
         super().__init__(config, "twitter", timeout)
         self.tweet_max_length = 280
         self.hashtag_count = 5
@@ -295,7 +295,7 @@ class TwitterAgent(BasePlatformAgent):
                         Post to X (Twitter) (Tweet {chunk_num}/{total_chunks}):
                         
                         X COMPOSER LAYOUT:
-                        - Compose button: BLUE PLUS icon (bottom-right of screen, above bottom navigation)
+                        - Compose button: BLUE PLUS icon in a blue circle, bottom-right, just above the bottom navigation bar
                         - Text input: Top of composer screen
                         - Attachment icons (below text): Media | GIF | Poll | Emoji | Schedule
                         - Post button: Top-right corner (says "Post")

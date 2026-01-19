@@ -15,11 +15,8 @@ class Config:
     LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO")
     
     # Agent timeouts (seconds)
-    AGENT_TIMEOUT = int(os.getenv("AGENT_TIMEOUT", "60"))
+    AGENT_TIMEOUT = int(os.getenv("AGENT_TIMEOUT", "1500"))
     CRAWL_TIMEOUT = int(os.getenv("CRAWL_TIMEOUT", "30"))
-    
-    # Content collection
-    WHATSAPP_PHONE_NUMBER = os.getenv("WHATSAPP_PHONE_NUMBER", "9518185205")
     
     # Link crawling
     MAX_CRAWL_DEPTH = int(os.getenv("MAX_CRAWL_DEPTH", "2"))
@@ -59,17 +56,12 @@ class Config:
     # Retry settings
     MAX_RETRIES = int(os.getenv("MAX_RETRIES", "3"))
     RETRY_DELAY = int(os.getenv("RETRY_DELAY", "2"))  # seconds
-    
-    # Output
-    SAVE_POSTS_TO_FILE = os.getenv("SAVE_POSTS_TO_FILE", "true").lower() == "true"
-    POSTS_OUTPUT_DIR = os.getenv("POSTS_OUTPUT_DIR", "./output/posts")
-    RESULTS_OUTPUT_DIR = os.getenv("RESULTS_OUTPUT_DIR", "./output/results")
 
 
 class DevelopmentConfig(Config):
     """Development configuration"""
     LOG_LEVEL = "DEBUG"
-    AGENT_TIMEOUT = 30
+    AGENT_TIMEOUT = 1500
     MAX_CRAWL_DEPTH = 5
 
 
@@ -85,7 +77,6 @@ class TestingConfig(Config):
     LOG_LEVEL = "DEBUG"
     AGENT_TIMEOUT = 10
     MAX_CRAWL_DEPTH = 0
-    SAVE_POSTS_TO_FILE = False
 
 
 def get_config(env: str = None) -> Config:

@@ -156,7 +156,7 @@ LOG_LEVEL=INFO                 # DEBUG, INFO, WARNING, ERROR
 WHATSAPP_PHONE_NUMBER=+1234567890
 MAX_CRAWL_DEPTH=2              # Recursion depth
 MAX_URLS_TO_CRAWL=5
-AGENT_TIMEOUT=60
+AGENT_TIMEOUT=1500
 SAVE_POSTS_TO_FILE=true
 ```
 
@@ -253,8 +253,7 @@ Available examples:
 1. Update `.env` with real phone number
 2. Run in development mode first: `python main.py --env development`
 3. Review console output and logs
-4. Monitor results JSON in `output/results/`
-5. Deploy to production when comfortable
+4. Deploy to production when comfortable
 
 ### To Extend
 
@@ -265,7 +264,6 @@ Available examples:
 
 ### To Monitor
 
-- Check `output/results/results_*.json` for detailed metrics
 - Review console logs with appropriate `LOG_LEVEL`
 - Monitor platform-specific timeouts
 - Track collection success rates

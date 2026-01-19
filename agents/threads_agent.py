@@ -25,7 +25,7 @@ class ThreadsAgent(BasePlatformAgent):
     - Thread format for longer thoughts
     """
 
-    def __init__(self, config: DroidrunConfig, timeout: int = 400):
+    def __init__(self, config: DroidrunConfig, timeout: int = 1500):
         super().__init__(config, "threads", timeout)
         self.post_max_length = 700  # Increased for longer, better posts
         self.hashtag_count = 3
@@ -337,8 +337,10 @@ class ThreadsAgent(BasePlatformAgent):
                         - Text input: Top of composer screen
                         - Publish button: Top-right corner
                         
-                        1. Look for a "Reply" button or similar option on the last posted Threads post
-                        2. Tap to open the reply composer
+                                1. Go to your profile and open the MOST RECENT post
+                                2. READ the post content to confirm it matches the last chunk you posted
+                                    - Only reply if the latest post content matches the current thread context
+                                3. If it matches, look for a "Reply" button on that post and tap it to open the reply composer
                         3. Call get_post_text() to retrieve the post content for this chunk ({len(chunk_text)} characters)
                         4. Store the returned text in a variable: post_content = get_post_text()
                         5. Type the ENTIRE returned text into the reply composer using: type(text=post_content, index=...)

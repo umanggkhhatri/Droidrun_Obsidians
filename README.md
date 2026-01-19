@@ -177,10 +177,6 @@ INSTAGRAM_ENABLED=true
 LINKEDIN_ENABLED=true
 REDDIT_ENABLED=true
 FACEBOOK_ENABLED=true
-
-# Output settings
-SAVE_POSTS_TO_FILE=true
-RESULTS_OUTPUT_DIR=./output/results
 ```
 
 ### Advanced Usage
@@ -206,7 +202,7 @@ async def custom_workflow():
 
 ### Result Structure
 
-Results are saved to `output/results/results_YYYYMMDD_HHMMSS.json`:
+Results are returned as JSON from the API endpoint:
 
 ```json
 {

@@ -11,12 +11,6 @@
    - Configuration guide
    - Troubleshooting
 
-2. **[QUICK_REFERENCE.sh](QUICK_REFERENCE.sh)** - Visual quick guide
-   - ASCII diagrams
-   - Key features overview
-   - Usage patterns
-   - File structure
-
 ### For Understanding the Design
 
 3. **[ARCHITECTURE.md](ARCHITECTURE.md)** - Deep dive
@@ -71,7 +65,7 @@
 → Follow [PRODUCTION_SUMMARY.md](PRODUCTION_SUMMARY.md)
 
 **...test the system**
-→ Use utilities from [testing_utils.py](testing_utils.py)
+→ Use the web UI at http://localhost:5000
 
 ---
 
@@ -83,9 +77,7 @@
 core/
 ├── models.py              Data structures (Content, PostResult)
 ├── base_agent.py          Abstract agent implementation
-├── content_collector.py   WhatsApp extraction
-├── link_crawler.py        URL crawling
-└── orchestrator.py        Main workflow
+└── link_crawler.py        URL crawling
 ```
 
 ### Platform Agents
@@ -114,7 +106,6 @@ utils/
 ```
 main.py                    Main entry point
 examples.py                Usage examples
-testing_utils.py           Testing utilities
 ```
 
 ### Documentation
@@ -124,7 +115,6 @@ README.md                  User guide (start here!)
 ARCHITECTURE.md            Technical design
 PRODUCTION_SUMMARY.md      Deployment guide
 FILE_STRUCTURE.md          File reference
-QUICK_REFERENCE.sh         Visual quick guide
 ```
 
 ### Configuration
@@ -146,9 +136,9 @@ requirements.txt           Python dependencies
 
 ### Step 2: Quick Test (10 minutes)
 
-1. Edit: `.env` with a WhatsApp phone number
-2. Run: `python examples.py`
-3. Observe: Which example runs successfully?
+1. Run the web app: `python web/app.py`
+2. Open http://localhost:5001 and post to a single platform
+3. Verify logs in the UI terminal pane
 
 ### Step 3: Understand Architecture (20 minutes)
 
@@ -158,15 +148,12 @@ requirements.txt           Python dependencies
 
 ### Step 4: Run Main Workflow (5-10 minutes)
 
-1. Run: `python main.py --env development`
-2. Monitor: Console output with colored logs
-3. Check: `output/results/` for JSON results
+Use the web UI (recommended) at http://localhost:5000. CLI workflows were removed as legacy.
 
 ### Step 5: Configuration & Customization (varies)
 
 1. Review: [README.md](README.md) - "Configuration"
 2. Modify: `.env` as needed
-3. Check: [examples.py](examples.py) for patterns
 
 ### Step 6: Production Ready (varies)
 
@@ -183,7 +170,6 @@ requirements.txt           Python dependencies
 **Installation & Setup**
 
 - [README.md](README.md) → "Installation"
-- [QUICK_REFERENCE.sh](QUICK_REFERENCE.sh) → "QUICK START"
 
 **Usage Examples**
 
@@ -223,8 +209,7 @@ requirements.txt           Python dependencies
 
 **Testing**
 
-- [testing_utils.py](testing_utils.py) → Testing utilities
-- [examples.py](examples.py) → Example usage
+- Use the web UI for testing at http://localhost:5000
 
 ---
 
@@ -337,7 +322,7 @@ Before running in production, verify:
 | Add a new platform?   | See [ARCHITECTURE.md](ARCHITECTURE.md) "Extensibility" |
 | Fix an error?         | Check [README.md](README.md) "Troubleshooting"         |
 | Deploy to production? | Read [PRODUCTION_SUMMARY.md](PRODUCTION_SUMMARY.md)    |
-| Test the system?      | Use [testing_utils.py](testing_utils.py)               |
+| Test the system?      | Use the web UI at http://localhost:5000                |
 | Understand data flow? | See diagrams in [ARCHITECTURE.md](ARCHITECTURE.md)     |
 
 ---
@@ -399,7 +384,6 @@ Before running in production, verify:
 - Main entry point: [main.py](main.py)
 - Start here: [README.md](README.md)
 - Try examples: [examples.py](examples.py)
-- Test utilities: [testing_utils.py](testing_utils.py)
 - Configuration: [.env.example](.env.example)
 - Dependencies: [requirements.txt](requirements.txt)
 
