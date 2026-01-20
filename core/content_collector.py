@@ -1,4 +1,4 @@
-"""Content collector for extracting data from WhatsApp"""
+"""Content collector module (deprecated - content now comes from web interface)"""
 
 import json
 import re
@@ -27,46 +27,40 @@ logger = get_logger(__name__)
 
 class ContentCollector:
     """
-    Collects content from WhatsApp chats.
+    Legacy content collector (deprecated).
     
-    Uses droidrun agents to navigate WhatsApp and extract messages,
-    links, and media information.
+    Content now comes directly from the web interface.
+    This class is kept for backward compatibility with examples.
     """
 
-    def __init__(self, config: DroidrunConfig, phone_number: str, timeout: int = 60):
+    def __init__(self, config: DroidrunConfig, phone_number: str = None, timeout: int = 60):
         """
-        Initialize content collector
+        Initialize content collector (deprecated)
         
         Args:
             config: DroidrunConfig instance
-            phone_number: Phone number to collect content from
+            phone_number: Deprecated parameter, kept for compatibility
             timeout: Timeout for operations in seconds
         """
         self.config = config
-        self.phone_number = phone_number
+        self.phone_number = phone_number or "deprecated"
         self.timeout = timeout
 
     async def collect_from_whatsapp(self) -> Optional[Content]:
         """
-        Collect content from WhatsApp chat of given number.
-        
-        Uses droidrun agent to:
-        1. Open WhatsApp application
-        2. Find the chat with specified phone number
-        3. Extract messages and links from recent conversation
-        4. Identify and collect any shared media
+        Deprecated: Content collection from WhatsApp is no longer supported.
+        Use the web interface to submit content directly.
         
         Returns:
-            Content object with extracted data or None if failed
+            None
         """
+        logger.warning("collect_from_whatsapp() is deprecated - use web interface instead")
+        return None
+        
+        # Legacy code kept for reference only
         try:
-            logger.info(f"Starting content collection from WhatsApp: {self.phone_number}")
-            
-            goal = self._create_collection_goal()
-            
-            logger.debug(f"Running collection agent with goal: {goal[:100]}...")
-            agent = DroidAgent(goal=goal, config=self.config, output_model=LastMessage)
-            result = await agent.run(timeout=self.timeout)
+            logger.info("This method is deprecated")
+            return None
 
             if not result.success:
                 logger.error(f"Failed to collect WhatsApp content: {result.reason}")
@@ -112,25 +106,8 @@ class ContentCollector:
             return None
 
     def _create_collection_goal(self) -> str:
-        """Create goal description for content collection agent"""
-        return f"""
-        Collect content from WhatsApp chat:
-        1. Open WhatsApp application
-        2. Find and open the chat with phone number/identifier: {self.phone_number}
-        3. Focus on the last incoming or outgoing message only (most recent entry)
-        4. Inspect the last message for:
-           - Text content (capture exact text)
-           - Links/URLs (if any)
-           - Media files (photos, images, videos, audio)
-           - Video descriptions or captions
-        5. Return ONLY the data needed to populate the structured model fields:
-           - last_message_text (string - the text portion)
-           - last_message_links (list of URLs in the message)
-           - media (list of media file paths or descriptions - photos, images, audio, etc.)
-           - videos (list of video file paths, URLs, or video descriptions if present)
-           - summary (1-2 lines of context, optional)
-        6. Do not include unrelated messages. Keep output concise and structured.
-        """
+        """Deprecated: Create goal description for content collection agent"""
+        return "Deprecated method"
 
 
     @staticmethod

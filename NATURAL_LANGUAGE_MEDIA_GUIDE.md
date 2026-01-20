@@ -296,7 +296,7 @@ Results returned to user
 
 ## ⚠️ Important Notes
 
-- **Config required:** `~/.droidrun/config.yaml` must exist
+- **Config required:** `config/droidrun_config.yaml` must exist
 - **Threads only:** Twitter/Instagram/LinkedIn are disabled
 - **Optional media:** Users can post without media
 - **No file uploads:** Web server doesn't store any media files
@@ -316,7 +316,7 @@ A: Check if Droidrun agent received the goal. Media instructions should be in ag
 A: Verify SSE stream is working. Check browser console for errors.
 
 **Q: Server won't start**  
-A: Verify `~/.droidrun/config.yaml` exists. Check Flask port isn't in use.
+A: Verify `config/droidrun_config.yaml` exists. Check Flask port isn't in use.
 
 ---
 

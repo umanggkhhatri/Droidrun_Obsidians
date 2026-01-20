@@ -6,82 +6,25 @@
     <title>Social Media Automator</title>
     <link
       rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css"
+    />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap"
+      rel="stylesheet"
+    />
+    <link
+      rel="stylesheet"
       href="{{ url_for('static', filename='style.css') }}"
     />
   </head>
   <body>
     <div class="app">
-      <!-- Sidebar -->
-      <aside class="sidebar">
-        <div class="sidebar-header">
-          <div class="logo"></div>
-          <h1>Automator</h1>
-        </div>
-
-        <div class="platform-section">
-          <h3>Select Platforms</h3>
-          <div class="platform-list">
-            <label class="platform-item">
-              <input type="checkbox" name="platform" value="threads" checked />
-              <span class="platform-box">
-                <span class="platform-icon"></span>
-                <span class="platform-details">
-                  <span class="platform-name">Threads</span>
-                  <span class="platform-limit">500 chars</span>
-                </span>
-                <span class="platform-checkmark">✓</span>
-              </span>
-            </label>
-
-            <label class="platform-item">
-              <input type="checkbox" name="platform" value="instagram" />
-              <span class="platform-box">
-                <span class="platform-icon"></span>
-                <span class="platform-details">
-                  <span class="platform-name">Instagram</span>
-                  <span class="platform-limit">2200 chars</span>
-                </span>
-                <span class="platform-checkmark">✓</span>
-              </span>
-            </label>
-
-            <label class="platform-item">
-              <input type="checkbox" name="platform" value="twitter" />
-              <span class="platform-box">
-                <span class="platform-icon"></span>
-                <span class="platform-details">
-                  <span class="platform-name">X / Twitter</span>
-                  <span class="platform-limit">280 chars</span>
-                </span>
-                <span class="platform-checkmark">✓</span>
-              </span>
-            </label>
-
-            <label class="platform-item">
-              <input type="checkbox" name="platform" value="linkedin" />
-              <span class="platform-box">
-                <span class="platform-icon"></span>
-                <span class="platform-details">
-                  <span class="platform-name">LinkedIn</span>
-                  <span class="platform-limit">3000 chars</span>
-                </span>
-                <span class="platform-checkmark">✓</span>
-              </span>
-            </label>
-          </div>
-        </div>
-
-        <div class="sidebar-footer">
-          <span id="platformCount">1</span> platform selected
-        </div>
-      </aside>
-
-      <!-- Main Content -->
+      <!-- Main Content - Now on Left -->
       <main class="main-content">
         <!-- Compose Card -->
         <div class="card compose-card">
           <div class="card-header">
-            <h2>Compose</h2>
+            <h2>Context to Content Agent</h2>
             <button id="clearBtn" class="btn-ghost" title="Clear all">
               Clear
             </button>
@@ -110,7 +53,7 @@
               </summary>
               <textarea
                 id="mediaSourceInput"
-                placeholder="Examples:&#10;• Gallery recent 5 images&#10;• All media between Jan 4 and Jan 6&#10;• Screenshots from today"
+                placeholder="Examples:&#10;• Gallery recent images&#10;• All media between Jan 4 and Jan 6&#10;• Screenshots from today"
                 rows="3"
               ></textarea>
             </details>
@@ -129,10 +72,100 @@
           </div>
 
           <div class="card-footer">
-            <button id="postBtn" class="btn-primary">Post Now</button>
+            <button id="postBtn" class="btn-primary">
+              <i class="fas fa-paper-plane"></i> Post Now
+            </button>
           </div>
         </div>
 
+        <!-- Platform Selection - Below Other Options -->
+        <div class="card platform-card">
+          <div class="card-header">
+            <h2>Select Platforms</h2>
+            <span
+              id="platformCount"
+              style="color: var(--accent); font-weight: 600"
+              >1 selected</span
+            >
+          </div>
+
+          <div class="card-body">
+            <div class="platform-list">
+              <label class="platform-item">
+                <input
+                  type="checkbox"
+                  name="platform"
+                  value="threads"
+                  checked
+                />
+                <span class="platform-box">
+                  <span class="platform-icon"
+                    ><i class="fa-brands fa-threads"></i
+                  ></span>
+                  <span class="platform-details">
+                    <span class="platform-name">Threads</span>
+                    <span class="platform-limit">500 chars</span>
+                  </span>
+                  <span class="platform-checkmark">✓</span>
+                </span>
+              </label>
+
+              <label class="platform-item">
+                <input type="checkbox" name="platform" value="instagram" />
+                <span class="platform-box">
+                  <span class="platform-icon"
+                    ><i class="fa-brands fa-instagram"></i
+                  ></span>
+                  <span class="platform-details">
+                    <span class="platform-name">Instagram</span>
+                    <span class="platform-limit">2200 chars</span>
+                  </span>
+                  <span class="platform-checkmark">✓</span>
+                </span>
+              </label>
+
+              <label class="platform-item">
+                <input type="checkbox" name="platform" value="twitter" />
+                <span class="platform-box">
+                  <span class="platform-icon"
+                    ><i class="fa-brands fa-x-twitter"></i
+                  ></span>
+                  <span class="platform-details">
+                    <span class="platform-name">X / Twitter</span>
+                    <span class="platform-limit">280 chars</span>
+                  </span>
+                  <span class="platform-checkmark">✓</span>
+                </span>
+              </label>
+
+              <label class="platform-item">
+                <input type="checkbox" name="platform" value="linkedin" />
+                <span class="platform-box">
+                  <span class="platform-icon"
+                    ><i class="fa-brands fa-linkedin"></i
+                  ></span>
+                  <span class="platform-details">
+                    <span class="platform-name">LinkedIn</span>
+                    <span class="platform-limit">3000 chars</span>
+                  </span>
+                  <span class="platform-checkmark">✓</span>
+                </span>
+              </label>
+            </div>
+          </div>
+        </div>
+
+        <!-- Results Card -->
+        <div id="resultsSection" class="card results-card hidden">
+          <div class="card-header">
+            <h2>Results</h2>
+          </div>
+          <div id="resultsList" class="results-list"></div>
+        </div>
+      </main>
+
+      <!-- Sidebar - Now on Right for Agent Output -->
+      <aside class="sidebar">
         <!-- Terminal Card -->
         <div class="card terminal-card">
           <div class="terminal-header">
@@ -140,7 +173,7 @@
               <span class="dot red"></span>
               <span class="dot yellow"></span>
               <span class="dot green"></span>
-              <span class="terminal-title">Agent Output</span>
+              <span class="terminal-title">Terminal</span>
             </div>
             <div class="terminal-actions">
               <span id="statusIndicator" class="status-badge idle">● Idle</span>
@@ -159,15 +192,7 @@
             <span id="progressTextInline">0%</span>
           </div>
         </div>
-
-        <!-- Results Card -->
-        <div id="resultsSection" class="card results-card hidden">
-          <div class="card-header">
-            <h2>Results</h2>
-          </div>
-          <div id="resultsList" class="results-list"></div>
-        </div>
-      </main>
+      </aside>
     </div>
 
     <script src="{{ url_for('static', filename='app.js') }}"></script>

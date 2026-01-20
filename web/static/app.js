@@ -5,6 +5,7 @@ const state = {
   links: "",
   platforms: ["threads"],
   eventSource: null,
+  isPosting: false,
 };
 
 // DOM Elements
@@ -30,7 +31,7 @@ const progressTextInline = document.getElementById("progressTextInline");
 descriptionInput.addEventListener("input", handleDescriptionChange);
 mediaSourceInput.addEventListener("input", handleMediaSourceChange);
 linksInput.addEventListener("input", handleLinksChange);
-postBtn.addEventListener("click", handlePost);
+postBtn.addEventListener("click", handlePostOrStop);
 clearBtn.addEventListener("click", handleClear);
 clearLogBtn.addEventListener("click", clearTerminalLog);
 
@@ -60,19 +61,45 @@ function handleClear() {
 
 function updatePlatformCount() {
   const count = getSelectedPlatforms().length;
-  platformCount.textContent = count;
+  platformCount.textContent = `${count} selected`;
 
-  // Update button text
-  if (count === 0) {
-    postBtn.textContent = "Select a Platform";
-    postBtn.disabled = true;
-  } else if (count === 1) {
-    postBtn.innerHTML = "Post Now";
-    postBtn.disabled = false;
-  } else {
-    postBtn.innerHTML = `Post to ${count} Platforms`;
-    postBtn.disabled = false;
+  // Update button text (only if not currently posting)
+  if (!state.isPosting) {
+    if (count === 0) {
+      postBtn.textContent = "Select a Platform";
+      postBtn.disabled = true;
+    } else if (count === 1) {
+      postBtn.innerHTML = '<i class="fas fa-paper-plane"></i> Post Now';
+      postBtn.disabled = false;
+    } else {
+      postBtn.innerHTML = `<i class="fas fa-paper-plane"></i> Post to ${count} Platforms`;
+      postBtn.disabled = false;
+    }
   }
+}
+
+function handlePostOrStop() {
+  if (state.isPosting) {
+    handleStop();
+  } else {
+    handlePost();
+  }
+}
+
+function handleStop() {
+  appendToTerminalLog("Stop requested by user", "info");
+
+  // Close the event source
+  if (state.eventSource) {
+    state.eventSource.close();
+    state.eventSource = null;
+  }
+
+  // Reset state
+  setRunningState(false);
+  state.isPosting = false;
+
+  appendToTerminalLog("Process stopped", "error");
 }
 
 async function handlePost() {
@@ -93,6 +120,9 @@ async function handlePost() {
     alert("Please select at least one platform");
     return;
   }
+
+  // Set posting state
+  state.isPosting = true;
 
   // Clear previous logs and show running state
   clearTerminalLog();
@@ -132,6 +162,7 @@ async function handlePost() {
     appendToTerminalLog("Error: " + error.message, "error");
     alert("Error posting content: " + error.message);
   } finally {
+    state.isPosting = false;
     setRunningState(false);
     if (state.eventSource) {
       state.eventSource.close();
@@ -198,9 +229,22 @@ function connectProgressStream() {
 }
 
 function setRunningState(running) {
-  postBtn.disabled = running;
-
   if (running) {
+    // Change button to Stop
+    postBtn.innerHTML = '<i class="fas fa-stop"></i> Stop';
+    postBtn.classList.add("btn-stop");
+    postBtn.disabled = false;
+
+    // Disable all inputs except stop button
+    descriptionInput.disabled = true;
+    mediaSourceInput.disabled = true;
+    linksInput.disabled = true;
+    clearBtn.disabled = true;
+
+    // Disable platform checkboxes
+    const checkboxes = document.querySelectorAll('input[name="platform"]');
+    checkboxes.forEach((cb) => (cb.disabled = true));
+
     statusIndicator.textContent = "● Running";
     statusIndicator.classList.add("running");
     statusIndicator.classList.remove("idle");
@@ -208,6 +252,21 @@ function setRunningState(running) {
     progressFillInline.style.width = "0%";
     progressTextInline.textContent = "0%";
   } else {
+    // Restore Post button
+    postBtn.innerHTML = '<i class="fas fa-paper-plane"></i> Post Now';
+    postBtn.classList.remove("btn-stop");
+    postBtn.disabled = false;
+
+    // Enable all inputs
+    descriptionInput.disabled = false;
+    mediaSourceInput.disabled = false;
+    linksInput.disabled = false;
+    clearBtn.disabled = false;
+
+    // Enable platform checkboxes
+    const checkboxes = document.querySelectorAll('input[name="platform"]');
+    checkboxes.forEach((cb) => (cb.disabled = false));
+
     statusIndicator.textContent = "● Idle";
     statusIndicator.classList.remove("running");
     statusIndicator.classList.add("idle");
@@ -266,8 +325,14 @@ function displayResults(results) {
 document.addEventListener("DOMContentLoaded", () => {
   const checkboxes = document.querySelectorAll('input[name="platform"]');
   checkboxes.forEach((cb) => {
-    cb.addEventListener("change", () => {
-      state.platforms = getSelectedPlatforms();
+    cb.addEventListener("change", (e) => {
+      const selected = getSelectedPlatforms();
+      // Prevent unchecking the last selected platform
+      if (selected.length === 0) {
+        e.target.checked = true;
+        return;
+      }
+      state.platforms = selected;
       updatePlatformCount();
     });
   });

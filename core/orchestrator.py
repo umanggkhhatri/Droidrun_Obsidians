@@ -22,31 +22,31 @@ logger = get_logger(__name__)
 class ContentOrchestrator:
     """
     Main orchestrator for the complete workflow:
-    1. Collect content from WhatsApp
+    1. Receive content from web interface
     2. Crawl URLs for context
     3. Post to all platforms sequentially
     
     Manages:
-    - Content collection and enrichment
+    - Content enrichment via URL crawling
     - Platform agent initialization
     - Sequential posting workflow
     - Result tracking and reporting
     """
 
-    def __init__(self, config: DroidrunConfig, phone_number: str, app_config: Any = None):
+    def __init__(self, config: DroidrunConfig, phone_number: str = None, app_config: Any = None):
         """
         Initialize orchestrator
         
         Args:
             config: DroidrunConfig instance
-            phone_number: WhatsApp phone number to collect from
+            phone_number: Deprecated parameter, kept for backward compatibility
             app_config: Application configuration object
         """
         self.config = config
-        self.phone_number = phone_number
+        self.phone_number = phone_number or "deprecated"
         self.app_config = app_config or get_config()
         
-        # Initialize components
+        # Initialize components (collector kept for backward compatibility)
         self.collector = ContentCollector(
             config, phone_number,
             timeout=self.app_config.AGENT_TIMEOUT
@@ -131,11 +131,11 @@ class ContentOrchestrator:
             return {}
 
     async def _step_collect_content(self) -> Optional[Content]:
-        """Step 1: Collect content from WhatsApp"""
+        """Deprecated: Step 1 - Content now comes from web interface"""
         try:
             content = await self.collector.collect_from_whatsapp()
             if content:
-                logger.info(f"✓ Content collected: {len(content.extracted_urls)} URLs found")
+                logger.info(f"Content collected: {len(content.extracted_urls)} URLs found")
                 logger.debug(f"  Original text length: {len(content.original_text)} chars")
             return content
         except Exception as e:
@@ -143,7 +143,7 @@ class ContentOrchestrator:
             return None
 
     async def _step_crawl_context(self) -> Dict[str, Any]:
-        """Step 2: Crawl URLs for context"""
+        """Step 2: Crawl URLs for additional context"""
         try:
             if not self.collected_content or not self.collected_content.extracted_urls:
                 logger.warning("No URLs to crawl")
@@ -152,14 +152,14 @@ class ContentOrchestrator:
             context = await self.crawler.crawl_for_context(
                 self.collected_content.extracted_urls
             )
-            logger.info(f"✓ Crawled {len(context)} URLs for context")
+            logger.info(f"Crawled {len(context)} URLs for context")
             return context
         except Exception as e:
             logger.error(f"Failed during crawling: {str(e)}", exc_info=True)
             return {}
 
     async def _step_post_to_platforms(self, media_urls: Optional[List[str]] = None, selected_platforms: Optional[List[str]] = None) -> None:
-        """Steps 3-6: Post to platforms sequentially"""
+        """Post to selected platforms sequentially"""
         if not self.collected_content:
             logger.error("No content to post")
             return
@@ -183,7 +183,7 @@ class ContentOrchestrator:
         # If selected_platforms is provided, ONLY use those (and verify they're enabled)
         if selected_platforms:
             selected_set = set(selected_platforms)
-            logger.info(f"📋 Selected platforms from user: {selected_platforms}")
+            logger.info(f"Selected platforms from user: {selected_platforms}")
             
             # Filter to only selected platforms that are also enabled
             platforms = [
@@ -198,7 +198,7 @@ class ContentOrchestrator:
                 if name not in [p[0] for p in platforms]
             ]
             if disabled_selected:
-                logger.warning(f"⚠️  Selected platforms {disabled_selected} are disabled in config - skipping")
+                logger.warning(f"Selected platforms {disabled_selected} are disabled in config - skipping")
             
             # Log any selected platforms that don't exist
             invalid_selected = [
@@ -206,7 +206,7 @@ class ContentOrchestrator:
                 if name not in [p[0] for p in all_available_platforms]
             ]
             if invalid_selected:
-                logger.warning(f"⚠️  Invalid platform names {invalid_selected} - ignoring")
+                logger.warning(f"Invalid platform names {invalid_selected} - ignoring")
         else:
             # No selection provided - use all enabled platforms (backward compatibility)
             platforms = [
@@ -214,13 +214,13 @@ class ContentOrchestrator:
                 for name, agent, indicator in all_available_platforms
                 if self.app_config.PLATFORMS[name]["enabled"]
             ]
-            logger.info(f"📋 No platform selection provided - using all enabled platforms: {[p[0] for p in platforms]}")
+            logger.info(f"No platform selection provided - using all enabled platforms: {[p[0] for p in platforms]}")
         
         if not platforms:
-            logger.warning("⚠️  No platforms to post to (all disabled or none selected)")
+            logger.warning("No platforms to post to (all disabled or none selected)")
             return {}
         
-        logger.info(f"✅ Will post to {len(platforms)} platform(s): {[p[0] for p in platforms]}")
+        logger.info(f"Will post to {len(platforms)} platform(s): {[p[0] for p in platforms]}")
         
         for platform_name, agent, step_indicator in platforms:
             

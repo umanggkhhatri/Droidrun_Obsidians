@@ -1,5 +1,8 @@
 """
-Examples demonstrating how to use the social media agent system
+Examples demonstrating how to use the social media agent system.
+
+Note: Most examples are deprecated. Use the web interface instead:
+    python -m web.app --port 5001
 """
 
 import asyncio
@@ -20,17 +23,15 @@ from config.settings import get_config
 
 
 async def example_1_basic_workflow():
-    """Example 1: Basic complete workflow"""
+    """Example 1: Basic complete workflow (deprecated - use web interface)"""
     print("\n" + "="*60)
-    print("Example 1: Basic Complete Workflow")
+    print("Example 1: Basic Complete Workflow (DEPRECATED)")
+    print("Use web interface instead: python -m web.app")
     print("="*60)
     
-    # Setup
     config = DroidrunConfig()
-    phone_number = "+1234567890"
     
-    # Run full workflow
-    orchestrator = ContentOrchestrator(config, phone_number)
+    orchestrator = ContentOrchestrator(config)
     results = await orchestrator.run_full_workflow()
     
     # Print results
@@ -70,16 +71,15 @@ async def example_2_individual_agent():
 
 
 async def example_3_content_collection_only():
-    """Example 3: Just collect content without posting"""
+    """Example 3: Content collection (deprecated)"""
     print("\n" + "="*60)
-    print("Example 3: Content Collection Only")
+    print("Example 3: Content Collection (DEPRECATED)")
+    print("Content now comes from web interface")
     print("="*60)
     
     config = DroidrunConfig()
-    phone_number = "+1234567890"
     
-    # Collect content
-    collector = ContentCollector(config, phone_number)
+    collector = ContentCollector(config)
     content = await collector.collect_from_whatsapp()
     
     if content:
@@ -168,12 +168,12 @@ async def example_7_selective_platforms():
     print("Platforms enabled:")
     for platform, settings in app_config.PLATFORMS.items():
         if settings["enabled"]:
-            print(f"  ✓ {platform}")
+            print(f"  [ENABLED] {platform}")
         else:
-            print(f"  ✗ {platform}")
+            print(f"  [DISABLED] {platform}")
     
     # Now run workflow - only Instagram and LinkedIn will post
-    orchestrator = ContentOrchestrator(config, "+1234567890", app_config)
+    orchestrator = ContentOrchestrator(config, None, app_config)
     results = await orchestrator.run_full_workflow()
     
     for platform, result in results.items():
@@ -194,7 +194,7 @@ async def example_8_with_media():
         "https://example.com/architecture.png",
     ]
     
-    orchestrator = ContentOrchestrator(config, "+1234567890")
+    orchestrator = ContentOrchestrator(config)
     results = await orchestrator.run_full_workflow(media_urls=media_urls)
     
     print(f"\nPosted with {len(media_urls)} media files")

@@ -71,9 +71,8 @@ htmlcov/
 .nox/
 
 # DroidRun config (contains API keys)
-# Note: ~/.droidrun/config.yaml is outside repo, but if copied here:
-config.yaml
-droidrun_config.yaml
+# DroidRun config (now in config/ folder)
+config/droidrun_config.yaml
 
 # Secrets
 *.pem

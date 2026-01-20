@@ -1,0 +1,31 @@
+# DroidRun Configuration File
+# Copy this file to droidrun_config.yaml and fill in your settings
+
+llm_profiles:
+  default:
+    provider: "openai"  # Options: openai, anthropic, google, etc.
+    model: "gpt-4"
+    api_key: "${OPENAI_API_KEY}"  # Or set directly
+    
+  # Alternative profile example
+  # anthropic:
+  #   provider: "anthropic"
+  #   model: "claude-3-opus-20240229"
+  #   api_key: "${ANTHROPIC_API_KEY}"
+
+agent:
+  max_steps: 15  # Maximum steps agent can take
+  timeout: 1500  # Timeout in seconds
+  
+  # Optional: Enable vision capabilities
+  # codeact:
+  #   vision: true
+  # manager:
+  #   vision: true
+  # executor:
+  #   vision: true
+
+# Device configuration (optional)
+device:
+  # adb_device_id: "your-device-id"
+  # portal_url: "http://localhost:8080"

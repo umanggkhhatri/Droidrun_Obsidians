@@ -1,20 +1,13 @@
 """
-Social Media Content Posting Agent System
+Social Media Content Posting Agent System (CLI - Deprecated)
 
-A modular, production-ready system for collecting content from WhatsApp,
-enriching it through web crawling, and posting optimized content to multiple
-social media platforms (Twitter/X, Threads, Instagram, LinkedIn) using DroidRun agents.
+Legacy CLI interface - use web interface (web/app.py) instead.
+The web interface provides a modern UI with real-time progress tracking.
 
 Usage:
-    python main.py [--phone PHONE_NUMBER] [--media MEDIA_URL1 MEDIA_URL2 ...] [--env ENVIRONMENT]
+    python -m web.app --port 5001
 
-Environment Variables:
-    WHATSAPP_PHONE_NUMBER: Phone number to collect from (default: 9518185205)
-    APP_ENV: Environment (development, production, testing)
-    LOG_LEVEL: Logging level (DEBUG, INFO, WARNING, ERROR)
-    
-Example:
-    WHATSAPP_PHONE_NUMBER="+1234567890" python main.py
+This CLI is kept for backward compatibility only.
 """
 
 import asyncio
@@ -35,17 +28,14 @@ logger = setup_logger(__name__)
 def parse_arguments() -> argparse.Namespace:
     """Parse command line arguments"""
     parser = argparse.ArgumentParser(
-        description="Social Media Content Posting Agent System",
+        description="Social Media Content Posting Agent System (Deprecated - Use Web Interface)",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  # Use default WhatsApp phone number from environment
-  python main.py
+  # Run web interface (recommended)
+  python -m web.app --port 5001
   
-  # Specify phone number and media URLs
-  python main.py --phone "+1234567890" --media https://example.com/image1.jpg https://example.com/image2.jpg
-  
-  # Run in development mode with debug logging
+  # Run in development mode
   python main.py --env development
         """,
     )
@@ -54,7 +44,7 @@ Examples:
         "--phone",
         type=str,
         default=None,
-        help="WhatsApp phone number to collect content from",
+        help="Deprecated parameter (no longer used)",
     )
     
     parser.add_argument(
@@ -95,10 +85,7 @@ async def main():
         # Get configuration
         app_config = get_config(args.env)
         logger.info(f"Running in {app_config.__class__.__name__} mode")
-        
-        # Get phone number
-        phone_number = args.phone or app_config.WHATSAPP_PHONE_NUMBER
-        logger.info(f"Target WhatsApp chat: {phone_number}")
+        logger.warning("CLI mode is deprecated - use web interface: python -m web.app")
         
         # Get media URLs
         media_urls = args.media if args.media else None
@@ -106,11 +93,11 @@ async def main():
             logger.info(f"Attaching {len(media_urls)} media files")
         
         # Initialize DroidRun config from YAML (required)
-        cfg_path = os.path.join(os.path.expanduser("~"), ".droidrun", "config.yaml")
+        cfg_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "config", "droidrun_config.yaml")
         if not os.path.exists(cfg_path):
             raise FileNotFoundError(
                 f"Droidrun config.yaml not found at {cfg_path}.\n"
-                f"Run 'droidrun setup' or ensure ~/.droidrun/config.yaml exists with valid LLM profiles and API keys."
+                f"Run 'droidrun setup' or ensure config/droidrun_config.yaml exists with valid LLM profiles and API keys."
             )
         
         try:
@@ -126,14 +113,10 @@ async def main():
         if args.dry_run:
             logger.warning("Running in DRY-RUN mode - content will be prepared but NOT posted")
         
-        # Run workflow
+        # Run workflow (deprecated - returns empty results)
         logger.info("Starting workflow...")
-        results = await run_workflow(
-            phone_number=phone_number,
-            droidrun_config=droidrun_config,
-            app_config=app_config,
-            media_urls=media_urls,
-        )
+        logger.error("CLI workflow is no longer supported - use web interface")
+        results = {}
         
         # Summary
         if results:

@@ -61,7 +61,7 @@ class LinkCrawler:
         Returns:
             Combined text content from main page and all crawled links
         """
-        logger.info(f"🔗 Starting HTTP crawl for: {url}")
+        logger.info(f"Starting HTTP crawl for: {url}")
         self.visited_urls.clear()
         
         all_content = []
@@ -72,9 +72,9 @@ class LinkCrawler:
         if main_content:
             all_content.append(f"=== MAIN PAGE: {url} ===\n{main_content}")
             self.visited_urls.add(url)
-            logger.info(f"✅ Crawled main page, found {len(internal_links)} internal links")
+            logger.info(f"Crawled main page, found {len(internal_links)} internal links")
         else:
-            logger.warning(f"❌ Failed to crawl main page: {url}")
+            logger.warning(f"Failed to crawl main page: {url}")
             return ""
         
         # Crawl first-level internal links
@@ -87,12 +87,12 @@ class LinkCrawler:
                 
                 if page_content:
                     all_content.append(f"\n=== LINKED PAGE: {link} ===\n{page_content}")
-                    logger.info(f"✅ Crawled: {link}")
+                    logger.info(f"Crawled: {link}")
                 else:
-                    logger.warning(f"⚠️ Could not crawl: {link}")
+                    logger.warning(f"Could not crawl: {link}")
         
         combined = "\n\n".join(all_content)
-        logger.info(f"🔗 Crawl complete: {len(self.visited_urls)} pages, {len(combined)} chars total")
+        logger.info(f"Crawl complete: {len(self.visited_urls)} pages, {len(combined)} chars total")
         
         return combined
 
@@ -253,9 +253,9 @@ class LinkCrawler:
                         "content": content,
                         "url": url,
                     }
-                    logger.info(f"✓ Crawled {url}: {len(content)} chars")
+                    logger.info(f"Crawled {url}: {len(content)} chars")
                 else:
-                    logger.warning(f"⚠️ No content extracted from {url}")
+                    logger.warning(f"No content extracted from {url}")
             except Exception as e:
                 logger.error(f"Error crawling {url}: {str(e)}")
                 context[url] = {

@@ -1,42 +1,87 @@
 # Social Media Automator - Web Interface
 
-A simple web-based interface for uploading content and automatically posting to multiple social media platforms (Twitter, Threads, Instagram, LinkedIn).
+A modern web-based interface for posting content to multiple social media platforms (Threads, Instagram, Twitter/X, LinkedIn) with real-time progress tracking and natural language media selection.
 
-## Features
+## ✨ Features
 
-- 📸 Upload media files (images and videos)
-- ✍️ Write description/caption
-- 🔗 Add multiple links
-- 📱 Select target platforms
-- 🚀 Post to all platforms with one click
-- 📊 View results for each platform
+- 📝 **Rich Text Input**: Write descriptions up to 5000 characters
+- 📱 **Natural Language Media**: "Gallery recent 5 images" instead of file uploads
+- 🔗 **Link Crawling**: Automatic URL extraction and content enrichment
+- 🚀 **Multi-Platform Posting**: Threads, Instagram, Twitter/X, LinkedIn
+- 📊 **Real-Time Progress**: Server-Sent Events stream agent logs to browser
+- 🎨 **Modern UI**: Dark theme with green accents, responsive design
+- ⏹️ **Stop Button**: Abort workflow mid-execution
+- ✅ **Platform Validation**: Enforces at least one platform selected
+- 🔄 **Media Strategy Reuse**: Same media across all platforms
 
 ## Setup
 
 ### Prerequisites
 
-- Python 3.8+
+- Python 3.14+
 - Flask
-- Droidrun (for device automation)
+- DroidRun framework
+- Google API key (for content transformation)
+- Android device with ADB enabled
 
 ### Installation
 
 1. Install Python dependencies:
 
 ```bash
-pip install flask
+pip install flask google-generativeai beautifulsoup4 requests
 ```
 
-2. Ensure the main Droidrun system is set up (see parent README.md)
+2. Set up environment variable:
+
+```bash
+export GOOGLE_API_KEY="your-google-api-key-here"
+```
+
+3. Create `config/droidrun_config.yaml` with LLM profiles
+
+4. Ensure DroidRun system is set up (see parent README.md)
 
 ## Running the Web Server
 
 ```bash
-cd /Users/anirudh/Droidrun_Obsidians/web
+cd web
 python app.py
 ```
 
-The server will start on `http://localhost:5000`
+The server will start on `http://localhost:5001`
+
+## Usage
+
+1. **Open browser** to `http://localhost:5001`
+
+2. **Fill in the form**:
+   - Description (optional): Main post text
+   - Media Source (optional): Natural language like "Gallery recent 5 images"
+   - Links (optional): One URL per line
+   - Platforms (required): Select at least one
+
+3. **Click "Post Now"**:
+   - Watch real-time progress in terminal on right
+   - See agent actions and decisions
+   - View results for each platform
+
+4. **Stop if needed**:
+   - Button changes to "Stop" during posting
+   - Click to abort workflow
+   - All inputs disabled during posting
+
+## Media Instruction Examples
+
+```
+Gallery recent 5 images
+All media between Jan 4 and Jan 6
+Media from last 2 days
+WhatsApp chat with +91XXXXXXXXXX (last 10 messages)
+All videos from gallery
+Screenshots from today
+Content uploaded to device in the last 48 hours
+```
 
 ## API Endpoints
 
@@ -62,9 +107,9 @@ Main endpoint to post content to platforms.
 **Form Data:**
 
 - `text` (string): Post description/caption
+- `media_source_instructions` (string): Natural language media selection
 - `links` (string): Links (one per line)
-- `media` (files): Media files (images/videos)
-- `platforms` (JSON array): Selected platforms ["twitter", "threads", "instagram", "linkedin"]
+- `platforms` (JSON array): Selected platforms `["threads", "instagram", "twitter", "linkedin"]`
 
 **Response:**
 
@@ -74,11 +119,30 @@ Main endpoint to post content to platforms.
   "message": "Content posted successfully",
   "results": [
     {
-      "platform": "twitter",
+      "platform": "threads",
       "success": true,
-      "reason": "Posted successfully"
+      "reason": "Post published successfully",
+      "error": null
     }
   ]
+}
+```
+
+### GET `/api/progress`
+
+Server-Sent Events (SSE) stream for real-time progress updates.
+
+**Event Data:**
+
+```json
+{
+  "step": 1,
+  "total": 3,
+  "message": "🔄 Preparing content",
+  "details": "Media Source: Gallery recent 5 images",
+  "percentage": 33,
+  "log": "Starting content preparation...",
+  "log_type": "info"
 }
 ```
 
@@ -86,60 +150,81 @@ Main endpoint to post content to platforms.
 
 ```
 web/
-├── app.py                 # Flask server
+├── app.py                 # Flask server with SSE support
+├── README.md             # This file
 ├── templates/
-│   └── index.html        # Main web interface
+│   └── index.html        # Main web UI (two-column layout)
 └── static/
-    ├── style.css         # Styling
-    └── app.js            # Frontend logic
+    ├── style.css         # Dark theme with green accents
+    └── app.js            # Frontend logic + EventSource SSE
 ```
 
 ## Supported Platforms
 
-- **Twitter (X)**: 280 character posts
 - **Threads**: 500 character posts
-- **Instagram**: 2200 character captions
-- **LinkedIn**: 3000 character posts
+- **Instagram**: 2200 character captions with share sheet fallback
+- **Twitter/X**: 280 character posts
+- **LinkedIn**: 3000 character posts with media instruction parsing
 
-## Supported Media Types
+## UI Features
 
-- Images: PNG, JPG, JPEG, GIF
-- Videos: MP4, MOV, WebM
+- **Two-Column Layout**: Main form on left, terminal output on right
+- **Dark Theme**: Zinc/slate colors with green accent (#22c55e)
+- **Platform Selector**: 4 buttons in single line with Font Awesome icons
+- **Terminal Output**: Real-time agent logs with color coding
+- **Progress Bar**: Shows completion percentage
+- **Stop Button**: Changes from "Post Now" to red "Stop" during execution
+- **Input Disabling**: All form controls disabled during posting (except Stop)
+- **Platform Validation**: Must select at least one, can't deselect last one
 
 ## Troubleshooting
 
-**Port 5000 already in use:**
+**Port already in use:**
 
 ```bash
-lsof -i :5000
-kill -9 <PID>
+lsof -ti:5001 | xargs kill -9
 ```
 
-**File upload errors:**
+**GOOGLE_API_KEY Error:**
 
-- Check `/tmp/web_uploads` directory permissions
-- Ensure media files are in supported formats
-- Check file size (max 50MB)
+```bash
+export GOOGLE_API_KEY="your-api-key"
+```
 
-**Posting fails:**
+**Config.yaml Not Found:**
 
-- Ensure Droidrun is properly configured
-- Check device is connected via ADB
-- Verify `~/.droidrun/config.yaml` exists
+```bash
+mkdir -p ~/.droidrun
+# Create config.yaml with LLM profiles
+```
+
+**Progress Stream Disconnects:**
+
+- Check browser console
+- Verify Flask server running
+- Refresh the page
+
+**Platform Posting Fails:**
+
+- Verify app installed on device
+- Check account logged in
+- Review terminal logs
 
 ## Development
 
-To enable debug mode and auto-reload:
+Debug mode:
 
-```python
-app.run(debug=True)
+```bash
+LOG_LEVEL=DEBUG python app.py
 ```
-
-(Already enabled in app.py)
 
 ## Production Notes
 
-For production deployment:
+Use production WSGI server:
+
+```bash
+gunicorn -w 4 -b 0.0.0.0:5001 app:app --timeout 300
+```
 
 1. Set `debug=False` in `app.py`
 2. Use a production WSGI server (Gunicorn/uWSGI)

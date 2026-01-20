@@ -244,7 +244,7 @@ Clear form (on success)
 - [ ] Progress stream shows media instructions in details
 - [ ] Results display success/failure
 - [ ] Clear button resets all fields
-- [ ] Config file (~/.droidrun/config.yaml) being read on startup
+- [ ] Config file (config/droidrun_config.yaml) being read on startup
 
 ## Common Issues
 

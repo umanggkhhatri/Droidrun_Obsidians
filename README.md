@@ -1,420 +1,383 @@
-# Social Media Content Posting Agent System
+# Social Media Automation System
 
-A production-ready, modular system for collecting content from WhatsApp, enriching it through intelligent web crawling, and posting platform-optimized content to Instagram, LinkedIn, Reddit, and Facebook using DroidRun mobile automation agents.
+A production-ready web application for posting content to multiple social media platforms (Threads, Instagram, Twitter/X, LinkedIn) using intelligent content transformation and DroidRun mobile automation.
 
-## Architecture Overview
+## Key Features
+
+### Modern Web Interface
+
+- **Real-time Progress Streaming**: Server-Sent Events (SSE) for live agent updates
+- **Terminal-Style Output**: Watch agent thinking and actions in real-time
+- **Multi-Platform Support**: Post to Threads, Instagram, Twitter/X, and LinkedIn
+- **AI Content Transformation**: Google Gemini optimizes content per platform
+- **Natural Language Media Selection**: "Gallery recent 5 images" or "Screenshots from today"
+- **Link Crawling**: Automatically extracts content from provided URLs
+- **Stop Button**: Abort posting workflow mid-execution
+- **Responsive Design**: Dark theme with green accents
+
+### Intelligent Automation
+
+- **Platform-Specific Content**: AI adapts text, hashtags, and tone for each platform
+- **Media Strategy Reuse**: Same media selection across platforms for consistency
+- **Sequential Posting**: Posts to platforms one at a time to avoid conflicts
+- **Error Handling**: Comprehensive logging and graceful failure recovery
+- **Share Sheet Fallback**: Instagram Feed → Reels → plain Instagram hierarchy
+
+## Quick Start
+
+### Prerequisites
+
+- Python 3.8+
+- DroidRun framework installed (`pip install droidrun`)
+- Android device with USB debugging enabled
+- Google API key for content transformation
+
+### Installation
+
+1. **Install dependencies**
+
+   ```bash
+   pip install -r requirements.txt
+   ```
+
+2. **Configure environment**
+
+   ```bash
+   export GOOGLE_API_KEY="your-google-api-key-here"
+   ```
+
+3. **Set up DroidRun**
+
+   ```bash
+   # Copy example config
+   cp config/droidrun_config.yaml.example config/droidrun_config.yaml
+
+   # Edit config/droidrun_config.yaml and add your LLM API keys
+   # See https://docs.droidrun.ai for configuration details
+   ```
+
+4. **Connect Android device**
+
+   a. Connect phone via USB cable
+
+   b. Enable USB debugging on phone:
+   - Settings → About Phone
+   - Tap "Build Number" 7 times
+   - Settings → Developer Options
+   - Enable "USB Debugging"
+
+   c. Accept permission prompt on phone
+
+   d. Run setup:
+
+   ```bash
+   droidrun setup
+   ```
+
+   e. Verify connection:
+
+   ```bash
+   droidrun ping
+   ```
+
+### Running the Application
+
+```bash
+python web/app.py
+```
+
+Open browser to `http://localhost:5001`
+
+## Usage
+
+### Web Interface Workflow
+
+1. **Write Description** (optional)
+   - Your main post content
+   - Will be transformed for each platform
+
+2. **Add Media Instructions** (optional)
+   - Natural language: "Gallery recent 5 images"
+   - Examples: "Screenshots from today", "Media from last 2 days"
+
+3. **Add Links** (optional)
+   - One URL per line
+   - Content will be crawled and incorporated
+
+4. **Select Platforms** (required)
+   - Choose: Threads, Instagram, Twitter/X, LinkedIn
+   - Must select at least one
+
+5. **Click "Post Now"**
+   - Watch real-time progress
+   - Results appear for each platform
+   - Use "Stop" to abort if needed
+
+### Natural Language Media Examples
 
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│                         Main Orchestrator                        │
-├─────────────────────────────────────────────────────────────────┤
-│                                                                   │
-│  1. Content Collector    2. Link Crawler      3. Platform Agents │
-│  └─ WhatsApp Chat        └─ URL Extraction    ├─ Instagram      │
-│     Message Extraction      Context Gathering  ├─ LinkedIn       │
-│     Link Extraction         Recursive Crawl    ├─ Reddit         │
-│     Media Detection         (2-level deep)     └─ Facebook       │
-│                                                                   │
-└─────────────────────────────────────────────────────────────────┘
+Gallery recent images
+All media between Jan 4 and Jan 6
+Media from last 2 days
+All videos from gallery
+Screenshots from today
+Content uploaded in the last 48 hours
 ```
 
-## Features
+## Architecture
 
-### 🔄 Complete Workflow
+```
+┌──────────────────────────────────────────────────────────┐
+│                    Web Interface                          │
+│                 (Flask + SSE Progress)                    │
+├──────────────────────────────────────────────────────────┤
+│                                                            │
+│  Content Input      Link Crawler      Platform Agents    │
+│  ├─ Description     ├─ URL Extract    ├─ Threads         │
+│  ├─ Media Hints     ├─ Context        ├─ Instagram       │
+│  └─ Links           └─ AI Transform   ├─ Twitter/X       │
+│                                        └─ LinkedIn        │
+└──────────────────────────────────────────────────────────┘
+```
 
-- **Content Collection**: Extracts messages and links from WhatsApp chats
-- **Context Enrichment**: Crawls URLs up to 2 levels deep for additional context
-- **Multi-Platform Posting**: Sequentially posts to 4 major platforms
-- **Platform Optimization**: Each agent adapts content for its platform
+## Platform Agents
 
-### 📱 Platform-Specific Agents
+### Threads
 
-#### Instagram Agent
+- Conversational, community-oriented content
+- Thread support (multi-post style)
+- Natural tone and hashtags
+- 500 character limit per post
 
-- **Focus**: Flashy, visually engaging content
-- **Features**:
-  - Catchy captions (150-200 chars)
-  - 20+ relevant hashtags
-  - Emoji suggestions
-  - Carousel ideas for multi-image posts
+### Instagram
 
-#### LinkedIn Agent
+- Visual, engaging content with captions
+- Share sheet selection (Feed → Reels → Instagram fallback)
+- Catchy captions (150-200 chars)
+- 20+ relevant hashtags
+- Emoji suggestions
 
-- **Focus**: Professional, technical content
-- **Features**:
-  - Technical headlines
-  - Detailed descriptions (300-500 chars)
-  - 15 professional hashtags
-  - Thought leadership tone
+### Twitter/X
 
-#### Reddit Agent
+- Concise, viral-ready content
+- 280 character optimization
+- Trending hashtags
+- Media attachment via Google Photos
 
-- **Focus**: Community-appropriate discussions
-- **Features**:
-  - Community-specific formatting
-  - Discussion-starting titles (60-80 chars)
-  - 10-15 subreddit-specific tags
-  - Configurable subreddit targeting
+### LinkedIn
 
-#### Facebook Agent
-
-- **Focus**: Broad appeal, shareable content
-- **Features**:
-  - Engaging captions
-  - Accessible descriptions
-  - 12 relevant hashtags
-  - Engagement-boosting elements
-
-### ⚙️ Production-Ready Features
-
-- **Modular Architecture**: Each component is independent and reusable
-- **Error Handling**: Comprehensive error handling and logging
-- **Configuration Management**: Environment-based configuration
-- **Retry Logic**: Exponential backoff for failed operations
-- **Result Tracking**: Detailed logging and result persistence
-- **CLI Interface**: Command-line arguments for flexibility
+- Professional, technical content
+- Technical headlines and detailed descriptions
+- 15 professional hashtags
+- Thought leadership tone
 
 ## Project Structure
 
 ```
 .
-├── main.py                 # Entry point
-├── requirements.txt        # Dependencies
-├── .env.example           # Configuration template
-├── config/
-│   └── settings.py        # Configuration management
-├── core/
-│   ├── __init__.py
-│   ├── models.py          # Data models
-│   ├── base_agent.py      # Abstract base agent
-│   ├── content_collector.py # WhatsApp content collection
-│   ├── link_crawler.py    # URL crawling
-│   └── orchestrator.py    # Workflow orchestration
+├── web/
+│   ├── app.py                 # Flask server with SSE
+│   ├── templates/
+│   │   └── index.html        # Web UI
+│   └── static/
+│       ├── style.css         # Dark theme styling
+│       └── app.js            # Frontend + SSE client
 ├── agents/
-│   ├── __init__.py
-│   ├── instagram_agent.py
-│   ├── linkedin_agent.py
-│   ├── reddit_agent.py
-│   └── facebook_agent.py
-└── utils/
-    ├── __init__.py
-    ├── logger.py          # Logging utilities
-    └── text_utils.py      # Text processing utilities
+│   ├── threads_agent.py      # Threads posting logic
+│   ├── instagram_agent.py    # Instagram automation
+│   ├── twitter_agent.py      # Twitter/X posting
+│   └── linkedin_agent.py     # LinkedIn posting
+├── core/
+│   ├── models.py             # Data models
+│   ├── base_agent.py         # Abstract base agent
+│   ├── link_crawler.py       # URL crawling
+│   ├── content_transformer.py # AI optimization
+│   └── orchestrator.py       # Legacy CLI orchestrator
+├── config/
+│   ├── settings.py           # App configuration
+│   └── droidrun_config.yaml  # DroidRun settings
+├── utils/
+│   ├── logger.py             # Logging utilities
+│   └── text_utils.py         # Text processing
+└── requirements.txt          # Dependencies
 ```
 
-## Installation
+## How It Works
 
-### Requirements
+### Content Transformation Flow
 
-- Python 3.8+
-- DroidRun framework
-- Mobile device with ADB enabled
+```
+User Input (description + links + media)
+    ↓
+Extract URLs from description and links field
+    ↓
+Crawl URLs for content (2-level deep)
+    ↓
+Combine user description + crawled content
+    ↓
+AI Transformation (Google Gemini per platform)
+    ↓
+Platform-specific optimized content
+    ↓
+Sequential posting to selected platforms
+    ↓
+Real-time progress streamed to browser
+```
 
-### Setup Steps
+### Media Selection Strategy
 
-1. **Clone/Download Repository**
+1. **First Platform**: Agent navigates device to select media based on instructions
+2. **Subsequent Platforms**: Reuses same media selection strategy
+3. **Share Sheet Handling**:
+   - Instagram: Feed → Reels → Instagram fallback with waits
+   - LinkedIn: Explicit media instruction parsing
+   - Twitter/X: Direct share to Twitter
+   - Threads: Direct share to Threads
+
+## Configuration
+
+### Environment Variables
 
 ```bash
-cd Droidrun_Obsidians
+# Required
+export GOOGLE_API_KEY="your-google-api-key"
+
+# Optional
+export APP_ENV="production"  # development, production, testing
+export LOG_LEVEL="INFO"      # DEBUG, INFO, WARNING, ERROR
 ```
 
-2. **Install Dependencies**
+### DroidRun Configuration
 
-```bash
-pip install -r requirements.txt
+Edit `config/droidrun_config.yaml`:
+
+```yaml
+llm_profiles:
+  default:
+    provider: "openai" # or anthropic, google
+    model: "gpt-4"
+    api_key: "your-api-key"
+
+agent:
+  max_steps: 15
+  timeout: 1500 # seconds
 ```
 
-3. **Configure Environment**
+### Platform Settings
 
-```bash
-cp .env.example .env
-# Edit .env with your settings
-```
-
-4. **Verify DroidRun Installation**
-
-```bash
-python -c "from droidrun import DroidAgent; print('DroidRun ready')"
-```
-
-## Usage
-
-### Basic Usage
-
-```bash
-# Use default configuration from .env
-python main.py
-
-# Specify phone number
-python main.py --phone "+1234567890"
-
-# Add media URLs
-python main.py --phone "+1234567890" --media https://example.com/img1.jpg https://example.com/img2.jpg
-
-# Run in development mode
-python main.py --env development
-
-# Dry run (prepare content without posting)
-python main.py --dry-run
-```
-
-### Configuration
-
-Edit `.env` file to customize:
-
-```env
-# Target WhatsApp contact
-WHATSAPP_PHONE_NUMBER=+1234567890
-
-# Environment mode
-APP_ENV=production  # or development, testing
-
-# Crawling depth (1-2 recommended)
-MAX_CRAWL_DEPTH=2
-
-# Platform enablement
-INSTAGRAM_ENABLED=true
-LINKEDIN_ENABLED=true
-REDDIT_ENABLED=true
-FACEBOOK_ENABLED=true
-```
-
-### Advanced Usage
+Edit `config/settings.py` to enable/disable platforms:
 
 ```python
-from droidrun import DroidrunConfig
-from core import run_workflow
-
-async def custom_workflow():
-    droidrun_config = DroidrunConfig()
-
-    results = await run_workflow(
-        phone_number="+1234567890",
-        droidrun_config=droidrun_config,
-        media_urls=["https://example.com/image.jpg"]
-    )
-
-    for platform, result in results.items():
-        print(f"{platform}: {result.success}")
-```
-
-## Output
-
-### Result Structure
-
-Results are returned as JSON from the API endpoint:
-
-```json
-{
-  "timestamp": "2026-01-17T18:33:18",
-  "phone_number": "+1234567890",
-  "content_urls_collected": 5,
-  "context_pages_crawled": 8,
-  "platform_results": [
-    {
-      "platform": "instagram",
-      "success": true,
-      "reason": "Post published successfully",
-      "post_id": null,
-      "error": null,
-      "timestamp": "2026-01-17T18:35:00"
-    }
-    // ... results for other platforms
-  ]
+PLATFORMS = {
+    "threads": {"enabled": True, "timeout": 60},
+    "instagram": {"enabled": True, "timeout": 90},
+    "twitter": {"enabled": True, "timeout": 60},
+    "linkedin": {"enabled": True, "timeout": 90},
 }
 ```
 
-### Log Output
+## API Endpoints
 
-Detailed logs with color coding:
+### POST `/api/post`
 
-```
-[2026-01-17 18:33:18] INFO - core.orchestrator: Starting Social Media Content Orchestration Workflow
-[2026-01-17 18:33:20] INFO - core.orchestrator: ✓ Content collected: 5 URLs found
-[2026-01-17 18:33:45] INFO - core.orchestrator: ✓ Crawled 8 URLs for context
-[2026-01-17 18:34:00] INFO - core.orchestrator: ✓ Success: Post published successfully
-```
+Submit content for posting.
 
-## Extension Guide
+**Form Data:**
 
-### Adding a New Platform
+- `text`: Post description
+- `media_source_instructions`: Natural language media selection
+- `links`: URLs (one per line)
+- `platforms`: JSON array `["threads", "instagram"]`
 
-1. Create new agent file in `agents/`:
+**Response:**
 
-```python
-# agents/tiktok_agent.py
-from core import BasePlatformAgent
-
-class TikTokAgent(BasePlatformAgent):
-    async def _prepare_content(self, content, context, **kwargs):
-        # Custom content preparation
-        pass
-
-    async def _post_to_platform(self, prepared_content, media_urls=None):
-        # Custom posting logic
-        pass
+```json
+{
+  "success": true,
+  "message": "Content posted successfully",
+  "results": [{ "platform": "threads", "success": true, "reason": "Posted" }]
+}
 ```
 
-2. Add to orchestrator in `core/orchestrator.py`:
+### GET `/api/progress`
 
-```python
-from agents import TikTokAgent
+Server-Sent Events stream for real-time updates.
 
-self.tiktok_agent = TikTokAgent(config, timeout=60)
-```
+**Event Data:**
 
-3. Add to platform posting sequence in `_step_post_to_platforms()`
-
-### Customizing Content Preparation
-
-Each agent's `_prepare_content` method can be overridden for custom behavior:
-
-```python
-class CustomInstagramAgent(InstagramAgent):
-    async def _prepare_content(self, content, context, **kwargs):
-        # Custom logic here
-        return prepared_content
-```
-
-## API Reference
-
-### ContentCollector
-
-```python
-collector = ContentCollector(config, phone_number, timeout=60)
-content = await collector.collect_from_whatsapp()
-# Returns: Content object with original_text, extracted_urls, etc.
-```
-
-### LinkCrawler
-
-```python
-crawler = LinkCrawler(config, max_depth=2, max_urls=5, timeout=30)
-context = await crawler.crawl_for_context(urls)
-# Returns: Dict[url, crawled_data]
-```
-
-### Platform Agents
-
-```python
-agent = InstagramAgent(config, timeout=60)
-result = await agent.prepare_and_post(content, context, media_urls=None)
-# Returns: PostResult with success status and details
-```
-
-### Orchestrator
-
-```python
-orchestrator = ContentOrchestrator(config, phone_number)
-results = await orchestrator.run_full_workflow(media_urls=None)
-# Returns: Dict[platform_name, PostResult]
-```
-
-## Environment Modes
-
-### Development
-
-- Debug logging enabled
-- Shorter timeouts (10-30s)
-- Single crawl depth
-- Useful for testing
-
-```bash
-APP_ENV=development python main.py
-```
-
-### Production
-
-- Warning+ logging
-- Standard timeouts
-- Full crawl depth
-- Retry enabled
-- Result persistence
-
-```bash
-APP_ENV=production python main.py
-```
-
-### Testing
-
-- Debug logging
-- Minimal crawling
-- File output disabled
-- For automated tests
-
-```bash
-APP_ENV=testing python main.py
+```json
+{
+  "step": 1,
+  "total": 3,
+  "message": "Preparing content",
+  "percentage": 33,
+  "log": "Starting transformation...",
+  "logType": "info"
+}
 ```
 
 ## Troubleshooting
 
 ### Common Issues
 
-**Content not collected**
+**GOOGLE_API_KEY not set**
 
-- Verify WhatsApp is installed on device
-- Check phone number format (+[country][number])
-- Ensure chat exists with that contact
+- Set environment: `export GOOGLE_API_KEY="your-key"`
+- Or create `.env` file in project root
 
-**Crawling fails**
+**config/droidrun_config.yaml not found**
 
-- Check internet connectivity
-- Verify URLs are accessible
-- Reduce `MAX_CRAWL_DEPTH` if too slow
+- Copy `config/droidrun_config.yaml.example`
+- Add your LLM API keys
+- Verify YAML syntax
 
-**Posts not publishing**
+**Platform posting fails**
 
-- Verify platform apps are installed
-- Check account login status
-- Review agent logs for specific errors
-- Try `--dry-run` to test content preparation
+- Check app is installed on device
+- Verify account is logged in
+- Review logs for specific errors
+
+**Media selection fails**
+
+- Ensure instructions are clear
+- Check Google Photos app is installed
+- Verify device has media in specified timeframe
+
+**Progress stream disconnects**
+
+- Check browser console for errors
+- Verify Flask server is running
+- Check network connectivity
 
 ### Debug Mode
 
-Enable debug logging:
-
 ```bash
-LOG_LEVEL=DEBUG python main.py
+LOG_LEVEL=DEBUG python web/app.py
 ```
 
-This will show:
+Shows:
 
-- Agent decision-making process
-- Detailed error messages
+- Detailed agent decision-making
+- Full error stack traces
 - URL extraction details
 - Content transformation steps
 
-## Performance Considerations
+## Performance
 
-- **Crawling**: Average 5-10s per URL with 2-level depth
-- **Content Preparation**: 10-30s per platform
-- **Posting**: 20-60s per platform depending on media
-- **Total Workflow**: 2-5 minutes for full cycle
-
-Optimize with:
-
-- Reduce `MAX_CRAWL_DEPTH`
-- Lower `MAX_URLS_TO_CRAWL`
-- Increase timeouts on slow connections
+- **Link Crawling**: 5-10s per URL
+- **Content Transformation**: 3-5s per platform
+- **Platform Posting**: 20-60s per platform
+- **Total Workflow**: 1-4 minutes for 4 platforms with media
 
 ## License
 
 Project by Umang Khhatri
 
-## Contributing
-
-Contributions welcome! Please follow:
-
-- Modular design principles
-- Type hints for all functions
-- Comprehensive docstrings
-- Error handling best practices
-
 ## Support
 
-For issues or questions:
+For issues:
 
 1. Check troubleshooting section
-2. Review detailed logs with `--env development`
-3. Check DroidRun documentation
-4. Review agent-specific documentation in code
+2. Review terminal logs
+3. Check DroidRun documentation at https://docs.droidrun.ai
+4. Review code comments for agent-specific details

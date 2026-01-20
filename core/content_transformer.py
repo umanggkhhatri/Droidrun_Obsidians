@@ -57,7 +57,7 @@ def _calculate_char_limits(content: str) -> tuple[int, int]:
     min_chars = min(min_chars, 800)
     max_chars = min(max_chars, 2500)
     
-    logger.info(f"📊 Content analysis: {num_urls} URLs, crawled={has_crawled} → {min_chars}-{max_chars} chars")
+    logger.info(f"Content analysis: {num_urls} URLs, crawled={has_crawled} → {min_chars}-{max_chars} chars")
     
     return min_chars, max_chars
 
@@ -77,7 +77,7 @@ async def transform_content_with_llm(
         return content
 
     try:
-        logger.info(f"🔄 Starting content transformation ({len(content)} chars)...")
+        logger.info(f"Starting content transformation ({len(content)} chars)...")
 
         # Calculate dynamic character limits
         min_chars, max_chars = _calculate_char_limits(content)
@@ -124,24 +124,24 @@ async def transform_content_with_llm(
         try:
             from google import genai
         except ImportError:
-            logger.error("❌ google-genai not installed! Install with: pip install google-genai")
+            logger.error("google-genai not installed! Install with: pip install google-genai")
             return content
 
         api_key = os.getenv("GOOGLE_API_KEY") or os.getenv("GEMINI_API_KEY")
         if not api_key:
-            logger.error("❌ No Google API key found! Set GOOGLE_API_KEY environment variable.")
+            logger.error("No Google API key found! Set GOOGLE_API_KEY environment variable.")
             logger.error("   Run: export GOOGLE_API_KEY='your-api-key-here'")
             return content
 
         # Log that we found the key (mask it for security)
         masked_key = api_key[:8] + "..." + api_key[-4:] if len(api_key) > 12 else "***"
-        logger.info(f"✅ Using GOOGLE_API_KEY: {masked_key}")
+        logger.info(f"Using GOOGLE_API_KEY: {masked_key}")
 
         # Initialize client
         try:
             client = genai.Client(api_key=api_key)
         except Exception as e:
-            logger.error(f"❌ Failed to initialize Google GenAI client: {type(e).__name__}: {e}")
+            logger.error(f"Failed to initialize Google GenAI client: {type(e).__name__}: {e}")
             return content
 
         # Build dynamic prompt based on content type
@@ -249,7 +249,7 @@ Write the post now as a REAL HUMAN would ({min_chars}-{max_chars} chars). No AI 
 
         # If LLM echoes input, try a second pass with a stricter instruction
         if transformed and transformed.strip() == content:
-            logger.info("ℹ️ LLM returned identical text; retrying with stronger rewrite instruction")
+            logger.info("LLM returned identical text; retrying with stronger rewrite instruction")
             def _call_llm_second_pass():
                 stronger_prompt = prompt + "\n\nIMPORTANT: The post MUST be a complete rewrite with specific details extracted from the source. Include architecture details, key features, ingredients, or main points."
                 return client.models.generate_content(
@@ -263,7 +263,7 @@ Write the post now as a REAL HUMAN would ({min_chars}-{max_chars} chars). No AI 
             transformed = _extract_text(second)
 
         if not transformed:
-            logger.warning("⚠️ LLM returned empty or invalid content, using original")
+            logger.warning("LLM returned empty or invalid content, using original")
             return content
 
         transformed = transformed.strip()
@@ -281,16 +281,16 @@ Write the post now as a REAL HUMAN would ({min_chars}-{max_chars} chars). No AI 
                 transformed = transformed[len(prefix):].strip()
         
         if len(transformed) < 20:
-            logger.warning("⚠️ LLM returned too-short content, using original")
+            logger.warning("LLM returned too-short content, using original")
             return content
 
-        logger.info(f"✅ Content transformed successfully ({len(content)} → {len(transformed)} chars)")
-        logger.info(f"📝 FINAL TRANSFORMED TEXT:\n{transformed}")
+        logger.info(f"Content transformed successfully ({len(content)} → {len(transformed)} chars)")
+        logger.info(f"FINAL TRANSFORMED TEXT:\n{transformed}")
         return transformed
 
     except asyncio.TimeoutError:
-        logger.error("⏱️ LLM transformation timed out after 45 seconds")
+        logger.error("LLM transformation timed out after 45 seconds")
         return content
     except Exception as e:
-        logger.error(f"❌ Error transforming content: {type(e).__name__}: {e}")
+        logger.error(f"Error transforming content: {type(e).__name__}: {e}")
         return content

@@ -27,66 +27,72 @@ class TwitterAgent(BasePlatformAgent):
 
     def __init__(self, config: DroidrunConfig, timeout: int = 1500):
         super().__init__(config, "twitter", timeout)
-        self.tweet_max_length = 280
+        self.tweet_max_length = 280  # Twitter/X API limit
+        self.chunk_cutoff = 224  # Start looking for sentence breaks at 20% before limit (280 * 0.8 = 224)
         self.hashtag_count = 5
-        self.chunk_size = 200  # Target size for tweet threads (stay well under 280)
 
-    def _split_into_chunks(self, text: str, chunk_size: int = 200, max_chunks: int = 25) -> List[str]:
+    def _split_into_chunks(self, text: str, max_chunks: int = 25) -> List[str]:
         """
-        Split text into ~200 character chunks for tweet threads.
+        Split text into chunks with max 280 characters (Twitter limit), breaking at sentence boundaries.
         
-        Each chunk is independent and complete. Breaks at sentence boundaries.
-        Stays under 280 char limit with good margin.
+        Strategy:
+        - Start looking for sentence breaks at 224 chars (20% before 280 limit)
+        - Each chunk must end with sentence-ending punctuation or break cleanly
+        - No text overlap between chunks
+        - Each chunk is independent and complete
         """
-        if not text or len(text) <= chunk_size:
+        if not text or len(text) <= self.tweet_max_length:
             return [text]
         
         chunks = []
         remaining = text.strip()
         
         while remaining and len(chunks) < max_chunks:
-            if len(remaining) <= chunk_size:
+            # If remaining text fits in one chunk, add it and done
+            if len(remaining) <= self.tweet_max_length:
                 chunks.append(remaining)
                 break
             
-            # For tweets, prioritize sentence breaks for readability
-            safe_range = remaining[:chunk_size]
+            # Look for sentence break starting from 20% before max (224 chars for 280 limit)
+            search_range = remaining[:self.chunk_cutoff + 56]  # Search window: 224-280 chars
             sentence_found = False
             
-            # Look for sentence endings
+            # Try to find sentence endings, working backwards from the end
             for end_marker in ['. ', '? ', '! ', '.\n', '?\n', '!\n']:
-                pos = safe_range.rfind(end_marker)
-                if pos > 100:  # Need at least 100 chars for a good tweet
-                    end_pos = pos + 1  # Include punctuation
+                pos = search_range.rfind(end_marker)
+                if pos > 100:  # Need at least 100 chars for meaningful tweet
+                    end_pos = pos + 1  # Include the punctuation
                     chunk = remaining[:end_pos].strip()
-                    chunks.append(chunk)
-                    remaining = remaining[end_pos + len(end_marker) - 1:].strip()
-                    sentence_found = True
-                    break
+                    if len(chunk) > 0:
+                        chunks.append(chunk)
+                        remaining = remaining[end_pos:].lstrip()
+                        sentence_found = True
+                        break
             
             if sentence_found:
                 continue
             
             # Try line break
-            line_pos = safe_range.rfind('\n')
+            line_pos = search_range.rfind('\n')
             if line_pos > 100:
                 chunk = remaining[:line_pos].strip()
                 chunks.append(chunk)
                 remaining = remaining[line_pos:].strip()
                 continue
             
-            # Break at word boundary
-            space_pos = safe_range.rfind(' ')
+            # Try word boundary
+            space_pos = search_range.rfind(' ')
             if space_pos > 100:
                 chunk = remaining[:space_pos].strip()
                 chunks.append(chunk)
                 remaining = remaining[space_pos:].strip()
             else:
-                # Hard break as last resort
-                chunk = remaining[:chunk_size].strip()
+                # Force break at max length
+                chunk = remaining[:self.tweet_max_length].strip()
                 chunks.append(chunk)
-                remaining = remaining[chunk_size:].strip()
+                remaining = remaining[self.tweet_max_length:].strip()
         
+        # Add any remaining text as final chunk
         if remaining and len(chunks) < max_chunks:
             chunks.append(remaining)
         
@@ -115,13 +121,13 @@ class TwitterAgent(BasePlatformAgent):
                 else:
                     user_text = str(content) if content else ""
                 
-                logger.info(f"📝 Received text for posting ({len(user_text)} chars): {user_text[:150]}...")
+                logger.info(f"Received text for posting ({len(user_text)} chars): {user_text[:150]}...")
                 
                 if user_text and len(user_text.strip()) > 10:
-                    # Truncate to 60 characters max for X/Twitter (short description)
+                    # Keep full text for chunking in _post_to_platform
                     final_text = user_text.strip()
-                    if len(final_text) > 60:
-                        final_text = truncate_text(final_text, 60)
+                    if len(final_text) > self.tweet_max_length:
+                        logger.info(f"Text ({len(final_text)} chars) will be chunked into multiple tweets")
                     
                     prepared = {
                         "text": final_text,
@@ -129,12 +135,13 @@ class TwitterAgent(BasePlatformAgent):
                         "thread": [],
                         "media_source_instructions": media_instructions
                     }
-                    logger.info(f"✅ Prepared tweet for posting ({len(final_text)} chars, max 60)")
+                    logger.info(f"SUCCESS: Prepared for Twitter ({len(final_text)} chars)")
                 else:
                     prepared = self._fallback_prepare_content(content, context)
                     prepared["media_source_instructions"] = media_instructions
                 
                 logger.info("Content prepared (simple mode) - ready for media-first posting")
+                prepared["media_selection_strategy"] = context.get("media_selection_strategy", "") if isinstance(context, dict) else ""
                 return prepared
             
             # No media instructions - use full agent-based content generation
@@ -158,11 +165,20 @@ class TwitterAgent(BasePlatformAgent):
             prepared["hashtags"] = hashtags
             prepared.setdefault("thread", [])
 
-            # Truncate tweet to 60 characters max (short description for X)
+            # Get the prepared text
             base = prepared.get("text", "")
-            trimmed = truncate_text(base, 60)
-            prepared["text"] = trimmed
+            
+            # Enforce Twitter max length (280 chars)
+            # Don't truncate aggressively - keep full text for chunking in _post_to_platform
+            if len(base) > self.tweet_max_length:
+                logger.warning(f"WARNING: Prepared text ({len(base)} chars) exceeds Twitter limit ({self.tweet_max_length} chars)")
+                logger.info(f"Text will be chunked into multiple tweets during posting phase")
+                # Keep full text for chunking in _post_to_platform
+                prepared["text"] = base
+            else:
+                prepared["text"] = base
 
+            prepared["media_selection_strategy"] = context.get("media_selection_strategy", "") if isinstance(context, dict) else ""
             logger.info("Twitter content prepared successfully")
             return prepared
         except Exception as e:
@@ -180,17 +196,19 @@ class TwitterAgent(BasePlatformAgent):
             thread = prepared_content.get("thread", [])
             video_urls = prepared_content.get("videos", [])
             media_source_instructions = prepared_content.get("media_source_instructions", "")
+            media_selection_strategy = prepared_content.get("media_selection_strategy", "")
+            strategy_hint_text = media_selection_strategy or "Use Google Photos Share -> Modify; re-select the same items you picked previously; avoid exploring new flows."
 
             full_text = text
             if hashtags:
                 full_text = f"{full_text}\n\n" + " ".join(hashtags)
             
             # Log the exact text being sent to the agent
-            logger.info(f"🎯 POSTING TWEET TO X ({len(full_text)} chars):")
-            logger.info(f"📝 {full_text}")
+            logger.info(f"POSTING TWEET TO X ({len(full_text)} chars):")
+            logger.info(f"{full_text}")
             
-            # Split text into ~200 character chunks for tweet threads
-            chunks = self._split_into_chunks(full_text, chunk_size=self.chunk_size)
+            # Split text into chunks with 280 char max, breaking at sentences
+            chunks = self._split_into_chunks(full_text)
             logger.info(f"Split into {len(chunks)} tweets for thread")
             for i, chunk in enumerate(chunks, 1):
                 logger.info(f"  Tweet {i} ({len(chunk)} chars): {chunk[:50]}...")
@@ -205,10 +223,12 @@ class TwitterAgent(BasePlatformAgent):
                 chunk_num = chunk_idx + 1
                 total_chunks = len(chunks)
                 
-                # Pass text as variable (not embedded in goal string)
+                # Unified approach: post_chunks array + current index
                 agent_variables = {
-                    "post_text": chunk_text,
-                    "chunk_num": chunk_num,
+                    "post_text": chunk_text,  # Required for get_post_text() tool
+                    "post_chunks": chunks,  # Array of all chunks
+                    "current_chunk_index": chunk_idx,  # 0-indexed
+                    "current_chunk_number": chunk_num,  # 1-indexed
                     "total_chunks": total_chunks,
                     "thread_items": thread,
                     "thread_items_json": thread_str
@@ -219,7 +239,7 @@ class TwitterAgent(BasePlatformAgent):
                     media_instruction = media_source_instructions.strip()
                     
                     goal = f"""
-                    ⚠️ CRITICAL: FOCUS ONLY ON X (TWITTER) - DO NOT OPEN ANY OTHER PLATFORMS
+                    CRITICAL: FOCUS ONLY ON X (TWITTER) - DO NOT OPEN ANY OTHER PLATFORMS
                     - You are ONLY posting to X (Twitter) right now
                     - DO NOT open Threads, Instagram, LinkedIn, or any other social media apps
                     - Complete this X (Twitter) task FULLY before finishing
@@ -242,53 +262,73 @@ class TwitterAgent(BasePlatformAgent):
                     - CRITICAL: SCROLL TO THE TOP in Photos tab first before looking for the media
                     - Photos tab shows: Media sorted by month
                     - Collections tab shows: People faces | Albums | Documents | App-wise media
+                                        - If you are NOT in Google Photos yet, you may use the device's app-opening action (e.g., open_app) to LAUNCH GOOGLE PHOTOS ONLY.
+                                            Do NOT use it to open any other app.
 
-                    Media collection (priority):
-                    1) Follow these EXACT instructions to locate/select media on device: {media_instruction}
-                    1a) CRITICAL: If opening Google Photos or any gallery app, SCROLL TO THE TOP first before looking for the media
-                    1b) ⭐ IMPORTANT USEFUL METHOD - TRY THIS FIRST: In Google Photos, select ONE media first, then SCROLL to find more media and tap them to add to selection
-                       * STEP-BY-STEP PROCESS:
-                         1. Select the FIRST media item
-                         2. Verify it's selected (check for selection indicator)
-                         3. SCROLL from the MIDDLE OF THE SCREEN to find the NEXT media item
-                            - Scroll the media grid UPWARDS (swipe from bottom area towards top)
-                            - Start scroll gesture a little UPWARDS from the bottom of visible screen to avoid overlay issues
-                         4. Tap to add it to selection
-                         5. Repeat steps 3-4 for each additional media
-                       * CRITICAL: Always scroll from the middle/center of the screen, NOT from edges
-                       * This is the MOST RELIABLE way to select multiple images
-                       * Don't try to select all at once - do it ONE BY ONE in sequence
-                       * ALWAYS attempt this method BEFORE trying any fallback approaches
-                    1c) MEDIA SELECTION STRATEGY:
-                       - Image ordering in Photos and in-app "Add media" is NOT trustworthy - they may show different orders
-                       - CRITICAL: You CANNOT select media separately and share them one by one to posting apps - must select all together
-                       - CRITICAL: NEVER use X/Twitter's in-app media picker/gallery - it shows media from all sources in wrong order
-                       - ALWAYS use Google Photos via share sheet - this ensures correct media selection
-                       - If the scroll method above fails, try these alternative approaches:
-                         * Select one image, then swipe up or down, then tap another image to add it to selection
-                         * Try using the collection/album view if direct media browsing fails
-                         * Try selecting from different tabs (Photos tab vs Collections tab)
-                                 * If a specific image won't select, try selecting adjacent images first, then deselect and reselect
+                          Media collection (priority):
+                          1) Follow these EXACT instructions to locate/select media on device: {media_instruction}
+                        1a) CRITICAL: If opening Google Photos or any gallery app, SCROLL TO THE TOP first before looking for the media
+                        - If you already selected media successfully earlier in this session, REUSE THAT SAME METHOD (Share → Modify) and re-select the SAME items; do not re-explore new flows
+                          1b) PREFERRED MULTI-PHOTO METHOD (use before scrolling):
+                              - Select the FIRST required photo
+                              - Tap the "Share" button
+                              - In the share sheet, tap "Modify" to add more photos
+                              - In the modify view, select the remaining required photos
+                              - Confirm selection, return to the share sheet, then choose X/Twitter
+                              - This is the primary strategy; use scrolling only if Modify is unavailable
+                          1c) SCROLL-BASED METHOD (fallback):
+                              - Select ONE media first, then SCROLL from the MIDDLE OF THE SCREEN to find the NEXT media item
+                                 * Scroll the media grid UPWARDS (swipe from bottom area towards top)
+                                 * Start scroll gesture a little UPWARDS from the bottom of visible screen to avoid overlay issues
+                              - Tap to add it to selection; repeat for each additional media
+                              - Always scroll from the middle/center of the screen, NOT from edges
+                              - Do it one by one; this is the fallback if Modify is not available
+                          1d) MEDIA SELECTION STRATEGY:
+                              - Image ordering in Photos and in-app "Add media" is NOT trustworthy - they may show different orders
+                              - CRITICAL: You CANNOT select media separately and share them one by one to posting apps - must select all together
+                              - CRITICAL: NEVER use X/Twitter's in-app media picker/gallery - it shows media from all sources in wrong order
+                              - ALWAYS use Google Photos via share sheet - this ensures correct media selection
+                              - If needed: collection/album view; different tabs; adjacent-image select/deselect/reselect
                     2) IMPORTANT: After selecting media, if you cannot find the share button or it's hidden behind a banner/overlay:
                        - Try swiping up slightly to reveal hidden UI elements
                        - Try tapping on empty space to dismiss any overlays or popups
                        - Look for share icons in corners or bottom of screen
                        - If needed, long-press on the media to get context menu with share option
                        - Scroll/swipe the thumbnail bar if the selected image seems hidden
-                    3) Use the system share sheet to share the selected media to X (com.twitter.android)
-                       so the X composer opens with the media already attached.
+                                        3) Use the system share sheet to share the selected media to X (com.twitter.android)
+                                             so the X composer opens with the media already attached.
+                                             SELECTION RULES (share sheet):
+                                             - Choose the PLAIN tile labeled exactly "X" or "Twitter" (no subtitle under it)
+                                             - DO NOT select tiles for "Direct Message", "Messages", or any DM options
+                                             - If multiple plain tiles appear, prefer the one nearest top-left
+                                             FALLBACK:
+                                             - If tapping X/Twitter lands on the home feed instead of the composer:
+                                                 * Press BACK twice quickly (within ~1s) to exit to the share sheet
+                                                 * If a toast says "Tap again to exit", press BACK once more immediately
+                                                 * If still in X/Twitter after two back presses: Press HOME, reopen Google Photos via open_app,
+                                                     re-select media, open share sheet again, and select the plain X/Twitter tile
 
-                    Compose in X:
-                    4) Call get_post_text() to retrieve the tweet content ({len(chunk_text)} characters)
-                    5) Store the returned text in a variable: tweet_content = get_post_text()
-                    6) Type the ENTIRE returned text into the composer using: type(text=tweet_content, index=...)
-                    7) Look for and tap the "Post" or "Tweet" button (usually at top right)
-                    8) Wait for confirmation that the tweet was published
-                    9) Return success status.
+                          Compose and Post Tweet:
+                          4) Confirm media thumbnails are visible in the composer BEFORE typing any text. If not, go back and re-share the media.
+                          5) Call get_post_text() to retrieve THIS TWEET's text (tweet {chunk_num}/{total_chunks}, {len(chunk_text)} chars)
+                          6) Store the returned text in a variable: tweet_content = get_post_text()
+                              - The function will print "POST_TEXT: <actual text>"
+                              - This printed text is what you MUST type
+                          7) Type the ENTIRE returned text into the composer using: type(text=tweet_content, index=...)
+                              - DO NOT type your own example text or placeholders
+                              - DO NOT type test strings like "This is a test post..."
+                              - ONLY use the variable tweet_content that contains the ACTUAL text
+                          8) Look for and tap the "Post" or "Tweet" button
+                          9) Wait for confirmation that the tweet was published
+                          10) Return success status.
 
-                    CRITICAL: The get_post_text() tool returns the ACTUAL tweet for this chunk.
-                    You MUST use that exact text - do NOT generate or summarize your own text.
-                    You MUST publish the tweet by tapping the Post button - don't leave it as draft.
+                    CRITICAL NOTES:
+                    - get_post_text() returns ONLY THIS TWEET (tweet {chunk_num} of {total_chunks})
+                    - This is part of a {total_chunks}-tweet thread
+                    - DO NOT try to access or type other tweets - only THIS tweet
+                          - You MUST use the exact text from get_post_text() - do NOT generate your own
+                          - NEVER type hardcoded strings - ALWAYS use tweet_content
+                          - You MUST publish the tweet - don't leave it as draft
                     
                     After posting:
                     9) Wait for confirmation that the tweet was published
@@ -302,11 +342,12 @@ class TwitterAgent(BasePlatformAgent):
                     if chunk_idx == 0:
                         # First tweet without media
                         goal = f"""
-                        ⚠️ CRITICAL: FOCUS ONLY ON X (TWITTER) - DO NOT OPEN ANY OTHER PLATFORMS
+                        CRITICAL: FOCUS ONLY ON X (TWITTER) - DO NOT OPEN ANY OTHER PLATFORMS
                         - You are ONLY posting to X (Twitter) right now
                         - DO NOT open Threads, Instagram, LinkedIn, or any other social media apps
                         - Complete this X (Twitter) task FULLY before finishing
                         - Return to home screen ONLY after X (Twitter) posting is complete
+                        - If a prior media_selection_strategy is provided: {strategy_hint_text}
                         
                         Post to X (Twitter) (Tweet {chunk_num}/{total_chunks}):
                         
@@ -340,7 +381,7 @@ class TwitterAgent(BasePlatformAgent):
                     else:
                         # Reply/continuation tweet
                         goal = f"""
-                        ⚠️ CRITICAL: FOCUS ONLY ON X (TWITTER) - DO NOT OPEN ANY OTHER PLATFORMS
+                        CRITICAL: FOCUS ONLY ON X (TWITTER) - DO NOT OPEN ANY OTHER PLATFORMS
                         - You are ONLY posting to X (Twitter) right now
                         - DO NOT open Threads, Instagram, LinkedIn, or any other social media apps
                         - Complete this X (Twitter) task FULLY before finishing

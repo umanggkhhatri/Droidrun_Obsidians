@@ -66,26 +66,28 @@ class LinkedInAgent(BasePlatformAgent):
                 else:
                     user_text = str(content) if content else ""
                 
-                logger.info(f"📝 Received text for posting ({len(user_text)} chars): {user_text[:150]}...")
+                logger.info(f"Received text for posting ({len(user_text)} chars): {user_text[:150]}...")
                 
                 if user_text and len(user_text.strip()) > 10:
                     final_text = user_text.strip()
-                    if len(final_text) > self.post_max_length - 200:
-                        final_text = truncate_text(final_text, self.post_max_length - 200)
+                    # Keep full text - will be handled in _post_to_platform
+                    if len(final_text) > self.post_max_length:
+                        logger.warning(f"Text ({len(final_text)} chars) exceeds limit, will truncate during posting")
                     
                     prepared = {
                         "headline": "",
                         "description": final_text,
-                        "hashtags": self._generate_default_hashtags(),
+                        "hashtags": [],
                         "cta": "",
                         "media_source_instructions": media_instructions
                     }
-                    logger.info(f"✅ Prepared post for LinkedIn ({len(final_text)} chars)")
+                    logger.info(f"SUCCESS: Prepared for LinkedIn ({len(final_text)} chars)")
                 else:
                     prepared = self._fallback_prepare_content(content, context)
                     prepared["media_source_instructions"] = media_instructions
                 
                 logger.info("Content prepared (simple mode) - ready for media-first posting")
+                prepared["media_selection_strategy"] = context.get("media_selection_strategy", "") if isinstance(context, dict) else ""
                 return prepared
             
             # No media instructions - use full agent-based content generation
@@ -116,6 +118,8 @@ class LinkedInAgent(BasePlatformAgent):
             ]
             
             prepared.setdefault("cta", "")
+
+            prepared["media_selection_strategy"] = context.get("media_selection_strategy", "") if isinstance(context, dict) else ""
             
             logger.info("LinkedIn content prepared successfully")
             return prepared
@@ -146,6 +150,8 @@ class LinkedInAgent(BasePlatformAgent):
             cta = prepared_content.get("cta", "")
             video_urls = prepared_content.get("videos", [])
             media_source_instructions = prepared_content.get("media_source_instructions", "")
+            media_selection_strategy = prepared_content.get("media_selection_strategy", "")
+            strategy_hint_text = media_selection_strategy or "Use Google Photos Share -> Modify; re-select the same items you picked previously; avoid exploring new flows."
             
             # Build full post content
             full_post = ""
@@ -160,69 +166,136 @@ class LinkedInAgent(BasePlatformAgent):
             full_post = truncate_text(full_post, self.post_max_length)
             
             # Log the exact text being sent to the agent
-            logger.info(f"🎯 POSTING TO LINKEDIN ({len(full_post)} chars):")
-            logger.info(f"📝 {full_post[:200]}...")
+            logger.info(f"POSTING TO LINKEDIN ({len(full_post)} chars):")
+            logger.info(f"{full_post[:200]}...")
             
             all_media = list(set((media_urls or []) + (video_urls or [])))
             
-            # Pass post text as variable
+            # Unified approach: post_chunks array (single item for LinkedIn)
             agent_variables = {
-                "post_text": full_post,
+                "post_text": full_post,  # Required for get_post_text() tool
+                "post_chunks": [full_post],  # Array with single chunk
+                "current_chunk_index": 0,  # Always 0 for single post
+                "current_chunk_number": 1,  # Always 1 for single post
+                "total_chunks": 1,  # Always 1 for LinkedIn
             }
-            
-            # CRITICAL: LinkedIn posting flow - ALWAYS open LinkedIn app directly, NO Google Photos
-            # User explicitly requested: Open LinkedIn from home screen, click post button at bottom, write and post
-            # This applies regardless of whether media_source_instructions are provided
-            
-            goal = f"""
-            ⚠️ CRITICAL: FOCUS ONLY ON LINKEDIN - DO NOT OPEN ANY OTHER PLATFORMS
-            - You are ONLY posting to LinkedIn right now
-            - DO NOT open Twitter/X, Threads, Instagram, or any other social media apps
-            - Complete this LinkedIn task FULLY before finishing
-            - Return to home screen ONLY after LinkedIn posting is complete
-            
-            Post to LinkedIn - Open LinkedIn app directly, NO Google Photos:
-            
-            LINKEDIN APP LAYOUT:
-            - Bottom navigation bar: Home | Network | POST (center, plus icon) | Notifications | Jobs
-            - POST button: CENTER of bottom navigation bar (plus "+" icon)
-            - Home screen: Shows feed with posts
-            
-            LINKEDIN COMPOSER LAYOUT (after tapping POST button):
-            - Text input field: Top of screen (says "What do you want to talk about?" or similar)
-            - Media attachment icons (bottom toolbar): Photo | Video | Document | Poll
-            - Audience selector: Top-left (Who can see this)
-            - Post button: Top-right corner (says "Post")
-            
-            CRITICAL INSTRUCTIONS:
-            1. Start from Android HOME SCREEN (not Google Photos, not any other app)
-            2. Open LinkedIn app (com.linkedin.android) - look for LinkedIn icon
-            3. Wait for LinkedIn home screen to load (you should see the feed)
-            4. Look at the BOTTOM navigation bar - find the POST button in the CENTER (plus "+" icon)
-            5. Tap the POST button at the BOTTOM center of the screen
-            6. Wait for the composer screen to open (you should see text input field at top)
-            7. Call get_post_text() to retrieve the post content ({len(full_post)} characters)
-            8. Store the returned text: post_content = get_post_text()
-            9. Type the ENTIRE returned text into the text input field using: type(text=post_content, index=...)
-            10. Look for the "Post" button at the TOP-RIGHT corner
-            11. Tap the "Post" button to publish
-            12. Wait for confirmation that the post was published (screen should change or show success)
-            13. After posting, press HOME button (or swipe up from bottom) to return to Android home screen
-            14. Verify you're on the home screen before finishing
-            
-            CRITICAL RULES:
-            - DO NOT open Google Photos
-            - DO NOT use share sheet
-            - DO NOT navigate through any gallery app
-            - START from Android HOME SCREEN
-            - OPEN LinkedIn app directly
-            - Use the POST button at BOTTOM CENTER of LinkedIn app
-            - The get_post_text() tool returns the ACTUAL post from the system
-            - You MUST use that exact text - do NOT generate or summarize your own text
-            - You MUST publish the post by tapping the Post button - don't leave it as draft
-            
-            Return success status and any confirmation info.
-            """
+            # LinkedIn posting flow: Media-first via Google Photos share sheet to ensure attachments
+            if media_source_instructions:
+                media_instruction = media_source_instructions.strip()
+                goal = f"""
+                CRITICAL: FOCUS ONLY ON LINKEDIN - DO NOT OPEN ANY OTHER PLATFORMS
+                - You are ONLY posting to LinkedIn right now
+                - DO NOT open Twitter/X, Threads, Instagram, or any other social media apps
+                - Complete this LinkedIn task FULLY before finishing
+                - Return to home screen ONLY after LinkedIn posting is complete
+                - If a prior media_selection_strategy is provided: {strategy_hint_text}
+
+                MEDIA-FIRST VIA GOOGLE PHOTOS SHARE SHEET (required):
+                - ALWAYS attach media before typing. Use Google Photos share sheet; do NOT rely on LinkedIn's in-app picker order.
+                - If you already selected media successfully earlier in this session, REUSE THE SAME METHOD (Share → Modify) and pick the SAME items; avoid re-exploring new flows.
+
+                GOOGLE PHOTOS LAYOUT:
+                - Top-left: Google Photos logo
+                - Bottom panel: Photos | Collections | Create | Search
+                - CRITICAL: SCROLL TO THE TOP in Photos tab first to find recent media
+                - If not in Photos, use open_app to launch com.google.android.apps.photos
+
+                MEDIA SELECTION (priority):
+                1) Follow these EXACT instructions to locate/select media on device: {media_instruction}
+                   - CRITICAL: Read and follow the instruction PRECISELY - it tells you which specific media to select
+                   - Do NOT select multiple items unless explicitly told to do so
+                   - If instruction says "third picture" - select ONLY the third picture, not the first three
+                   - If instruction says "second and fifth photos" - select ONLY those two, not all five
+                2) Preferred multi-photo method (use first if selecting MULTIPLE items):
+                    - Select the FIRST required photo
+                    - Tap the "Share" button
+                    - In the share sheet, tap "Modify" to add more photos
+                    - In the modify view, select the remaining required photos
+                    - Confirm selection, return to the share sheet
+                3) Fallback scroll method (only if Modify unavailable):
+                    - Select ONE media first, then scroll from the MIDDLE of the screen to find the next media item
+                    - Tap to add it; repeat for each additional media
+                4) Strategy notes:
+                    - Image ordering in Photos and in-app pickers may differ; select all at once via Photos
+                    - Do NOT try to share items one by one; select the full set together
+
+                SHARE SHEET SELECTION (LinkedIn):
+                - Choose the PLAIN tile labeled exactly "LinkedIn" (no subtitle). Avoid Messages/DM/Story variants.
+                - If multiple plain tiles appear, prefer the one nearest top-left.
+                - If tapping LinkedIn lands on the feed instead of the composer:
+                  * Press BACK twice quickly (within ~1s) to return to the share sheet
+                  * If still stuck, press HOME, reopen Photos via open_app, re-select media, and re-share to the plain LinkedIn tile
+
+                Compose in LinkedIn (after share sheet):
+                - Confirm media thumbnails are visible in the composer BEFORE typing. If missing, go BACK and re-share.
+                - Call get_post_text() to retrieve the post content ({len(full_post)} characters)
+                - Store it: post_content = get_post_text() (this printed text is what you type)
+                - Type the ENTIRE returned text into the text input field (use only post_content)
+                - Find and tap the "Post" button (typically TOP-RIGHT). Drafts are NOT acceptable; publish now.
+                - If a Draft prompt appears, choose Post/Publish, not Save Draft.
+
+                After posting:
+                - Wait for confirmation (screen change or success toast)
+                - Press HOME to return to Android home screen
+                - Verify home screen, then finish
+
+                Return success status and any confirmation info.
+                """
+            else:
+                # No explicit media instructions provided
+                goal = f"""
+                CRITICAL: FOCUS ONLY ON LINKEDIN - DO NOT OPEN ANY OTHER PLATFORMS
+                - You are ONLY posting to LinkedIn right now
+                - DO NOT open Twitter/X, Threads, Instagram, or any other social media apps
+                - Complete this LinkedIn task FULLY before finishing
+                - Return to home screen ONLY after LinkedIn posting is complete
+
+                MEDIA-FIRST VIA GOOGLE PHOTOS SHARE SHEET (required):
+                - ALWAYS attach media before typing. Use Google Photos share sheet; do NOT rely on LinkedIn's in-app picker order.
+                - If you already selected media successfully earlier in this session, REUSE THE SAME METHOD (Share → Modify) and pick the SAME items; avoid re-exploring new flows.
+
+                GOOGLE PHOTOS LAYOUT:
+                - Top-left: Google Photos logo
+                - Bottom panel: Photos | Collections | Create | Search
+                - CRITICAL: SCROLL TO THE TOP in Photos tab first to find recent media
+                - If not in Photos, use open_app to launch com.google.android.apps.photos
+
+                MEDIA SELECTION (priority):
+                1) Preferred multi-photo method (use first):
+                    - Select the FIRST required photo
+                    - Tap the "Share" button
+                    - In the share sheet, tap "Modify" to add more photos
+                    - In the modify view, select the remaining required photos
+                    - Confirm selection, return to the share sheet
+                2) Fallback scroll method (only if Modify unavailable):
+                    - Select ONE media first, then scroll from the MIDDLE of the screen to find the next media item
+                    - Tap to add it; repeat for each additional media
+                3) Strategy notes:
+                    - Image ordering in Photos and in-app pickers may differ; select all at once via Photos
+                    - Do NOT try to share items one by one; select the full set together
+
+                SHARE SHEET SELECTION (LinkedIn):
+                - Choose the PLAIN tile labeled exactly "LinkedIn" (no subtitle). Avoid Messages/DM/Story variants.
+                - If multiple plain tiles appear, prefer the one nearest top-left.
+                - If tapping LinkedIn lands on the feed instead of the composer:
+                  * Press BACK twice quickly (within ~1s) to return to the share sheet
+                  * If still stuck, press HOME, reopen Photos via open_app, re-select media, and re-share to the plain LinkedIn tile
+
+                Compose in LinkedIn (after share sheet):
+                - Confirm media thumbnails are visible in the composer BEFORE typing. If missing, go BACK and re-share.
+                - Call get_post_text() to retrieve the post content ({len(full_post)} characters)
+                - Store it: post_content = get_post_text() (this printed text is what you type)
+                - Type the ENTIRE returned text into the text input field (use only post_content)
+                - Find and tap the "Post" button (typically TOP-RIGHT). Drafts are NOT acceptable; publish now.
+                - If a Draft prompt appears, choose Post/Publish, not Save Draft.
+
+                After posting:
+                - Wait for confirmation (screen change or success toast)
+                - Press HOME to return to Android home screen
+                - Verify home screen, then finish
+
+                Return success status and any confirmation info.
+                """
             
             result = await self._run_droidrun_agent(goal, variables=agent_variables)
             
@@ -321,7 +394,7 @@ class LinkedInAgent(BasePlatformAgent):
             pass
 
         description = (
-            f"Excited to share {project}! 🚀\n\n"
+            f"Excited to share {project}!\n\n"
             f"This represents a significant step forward in how we approach challenges "
             f"and deliver value. Looking forward to hearing your thoughts and feedback.\n\n"
             f"What opportunities do you see here? Let's connect and discuss!"
@@ -331,5 +404,5 @@ class LinkedInAgent(BasePlatformAgent):
             "headline": "",
             "description": truncate_text(description, self.post_max_length - 200),
             "hashtags": self._generate_default_hashtags(),
-            "cta": "Share your thoughts in the comments! 👇",
+            "cta": "Share your thoughts in the comments!",
         }

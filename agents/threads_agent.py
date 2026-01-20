@@ -27,75 +27,80 @@ class ThreadsAgent(BasePlatformAgent):
 
     def __init__(self, config: DroidrunConfig, timeout: int = 1500):
         super().__init__(config, "threads", timeout)
-        self.post_max_length = 700  # Increased for longer, better posts
+        self.post_max_length = 500  # Threads API limit is 500 characters per post
+        self.chunk_cutoff = 400  # Start looking for sentence breaks at 20% before limit (500 * 0.8 = 400)
         self.hashtag_count = 3
-        self.chunk_size = 425  # Target size for thread chunks (400-450 range)
 
-    def _split_into_chunks(self, text: str, chunk_size: int = 425, max_chunks: int = 20) -> List[str]:
+    def _split_into_chunks(self, text: str, max_chunks: int = 20) -> List[str]:
         """
-        Split text into 400-450 character chunks for threading.
+        Split text into chunks with max 500 characters (Threads limit), breaking at sentence boundaries.
         
-        Each chunk is a complete, independent unit - breaks at paragraph or sentence boundaries.
-        No text overlap or repetition between chunks.
+        Strategy:
+        - Start looking for sentence breaks at 400 chars (20% before 500 limit)
+        - Each chunk must end with a sentence-ending punctuation mark
+        - No text overlap between chunks
+        - Each chunk is independent and complete
         """
-        if not text or len(text) <= chunk_size:
+        if not text or len(text) <= self.post_max_length:
             return [text]
         
         chunks = []
         remaining = text.strip()
         
         while remaining and len(chunks) < max_chunks:
-            if len(remaining) <= chunk_size:
+            # If remaining text fits in one chunk, add it and done
+            if len(remaining) <= self.post_max_length:
                 chunks.append(remaining)
                 break
             
-            # First, try to break at paragraph boundaries (double newline)
-            para_match = remaining[:chunk_size].rfind('\n\n')
-            if para_match > 200:  # Good paragraph break
-                chunk = remaining[:para_match].strip()
-                chunks.append(chunk)
-                remaining = remaining[para_match:].strip()  # Skip past the break
-                continue
-            
-            # Try to find a sentence break within safe range (300-425 chars)
-            # Look for sentence endings from the end backwards
-            safe_range = remaining[:chunk_size]
+            # Look for sentence break starting from 20% before max (400 chars for 500 limit)
+            search_range = remaining[:self.chunk_cutoff + 100]  # Search window: 400-500 chars
             sentence_found = False
             
+            # Try to find sentence endings, working backwards from the end
             for end_marker in ['. ', '? ', '! ', '.\n', '?\n', '!\n']:
-                pos = safe_range.rfind(end_marker)
-                if pos > 250:  # Only use if we get at least 250 chars
-                    # Include the punctuation, exclude the space/newline after
-                    end_pos = pos + 1  # Include the punctuation mark
+                # Search in the window but prefer closer to the cutoff
+                pos = search_range.rfind(end_marker)
+                if pos > 200:  # Need at least 200 chars for meaningful chunk
+                    end_pos = pos + 1  # Include the punctuation
                     chunk = remaining[:end_pos].strip()
-                    chunks.append(chunk)
-                    # Skip past the marker completely to avoid duplication
-                    remaining = remaining[end_pos + len(end_marker) - 1:].strip()
-                    sentence_found = True
-                    break
+                    if len(chunk) > 0:
+                        chunks.append(chunk)
+                        # Skip the punctuation and any following whitespace
+                        remaining = remaining[end_pos:].lstrip()
+                        sentence_found = True
+                        break
             
             if sentence_found:
                 continue
             
-            # No sentence break found, try line break
-            line_pos = safe_range.rfind('\n')
-            if line_pos > 250:
+            # No sentence break found in window, try paragraph break
+            para_pos = search_range.rfind('\n\n')
+            if para_pos > 200:
+                chunk = remaining[:para_pos].strip()
+                chunks.append(chunk)
+                remaining = remaining[para_pos:].strip()
+                continue
+            
+            # Try line break
+            line_pos = search_range.rfind('\n')
+            if line_pos > 200:
                 chunk = remaining[:line_pos].strip()
                 chunks.append(chunk)
                 remaining = remaining[line_pos:].strip()
                 continue
             
-            # Last resort: break at word boundary
-            space_pos = safe_range.rfind(' ')
-            if space_pos > 250:
+            # Last resort: break at word boundary within window
+            space_pos = search_range.rfind(' ')
+            if space_pos > 200:
                 chunk = remaining[:space_pos].strip()
                 chunks.append(chunk)
                 remaining = remaining[space_pos:].strip()
             else:
-                # Absolute last resort: hard break
-                chunk = remaining[:chunk_size].strip()
+                # Force break at max length
+                chunk = remaining[:self.post_max_length].strip()
                 chunks.append(chunk)
-                remaining = remaining[chunk_size:].strip()
+                remaining = remaining[self.post_max_length:].strip()
         
         # Add any remaining text as final chunk
         if remaining and len(chunks) < max_chunks:
@@ -105,54 +110,46 @@ class ThreadsAgent(BasePlatformAgent):
 
     async def _prepare_content(
         self,
-        content: str,
+        content: str | Dict[str, Any],
         context: Dict[str, Any],
         **kwargs,
     ) -> Optional[Dict[str, Any]]:
         try:
-            # Check for media_source_instructions FIRST
-            media_instructions = context.get("media_source_instructions", "")
-            if not media_instructions and isinstance(content, dict):
+            # Extract text from content (handle both str and dict)
+            if isinstance(content, dict):
+                user_text = content.get("text", "")
                 media_instructions = content.get("media_source_instructions", "")
+            else:
+                user_text = str(content) if content else ""
+                media_instructions = context.get("media_source_instructions", "")
             
-            # If media instructions exist, use simple text preparation (NO device agent)
-            # This prevents the agent from opening any apps before media collection
-            if media_instructions:
-                logger.info(f"Media instructions detected - using simple text prep (no device interaction)")
-                logger.info(f"Media instructions: {media_instructions[:80]}...")
+            # Also check context for media instructions
+            if not media_instructions:
+                media_instructions = context.get("media_source_instructions", "")
+            
+            logger.info(f"Threads prep: got text ({len(user_text)} chars), media_instructions={bool(media_instructions)}")
+            
+            # If we have actual user text (from transformed content), use it directly
+            if user_text and len(user_text.strip()) > 10:
+                logger.info(f"SUCCESS: Using provided text: {user_text[:100]}...")
                 
-                # Extract user's text directly - don't run device agent
-                if isinstance(content, dict):
-                    user_text = content.get("text", "")
-                else:
-                    user_text = str(content) if content else ""
+                final_text = user_text.strip()
+                # Keep full text for chunking in _post_to_platform
+                if len(final_text) > self.post_max_length:
+                    logger.warning(f"Text ({len(final_text)} chars) exceeds limit, will chunk during posting")
                 
-                # Log the text we received
-                logger.info(f"📝 Received text for posting ({len(user_text)} chars): {user_text[:150]}...")
-                
-                # If user provided text, use it; otherwise use a simple fallback
-                if user_text and len(user_text.strip()) > 10:
-                    # Don't truncate aggressively - keep the full transformed text
-                    final_text = user_text.strip()
-                    if len(final_text) > self.post_max_length:
-                        final_text = truncate_text(final_text, self.post_max_length - 10)
-                    
-                    prepared = {
-                        "text": final_text,
-                        "hashtags": [],
-                        "thread": [],
-                        "media_source_instructions": media_instructions
-                    }
-                    logger.info(f"✅ Prepared text for posting ({len(final_text)} chars)")
-                else:
-                    # Minimal fallback - let the media speak for itself
-                    prepared = self._fallback_prepare_content(content, context)
-                    prepared["media_source_instructions"] = media_instructions
-                
-                logger.info("Content prepared (simple mode) - ready for media-first posting")
+                prepared = {
+                    "text": final_text,
+                    "hashtags": [],
+                    "thread": [],
+                    "media_source_instructions": media_instructions
+                }
+                logger.info(f"SUCCESS: Prepared for Threads ({len(final_text)} chars)")
+                prepared["media_selection_strategy"] = context.get("media_selection_strategy", "") if isinstance(context, dict) else ""
                 return prepared
             
-            # No media instructions - use full agent-based content generation
+            # Only use agent if no text was provided
+            logger.info("No text provided, running device agent for content generation...")
             context_str = self._prepare_context_string(content, context)
             prompt = self._create_preparation_prompt(context_str)
 
@@ -173,11 +170,20 @@ class ThreadsAgent(BasePlatformAgent):
             prepared["hashtags"] = hashtags
             prepared.setdefault("thread", [])
 
-            # Truncate main post
+            # Get the prepared text
             base = prepared.get("text", "")
-            trimmed = truncate_text(base, self.post_max_length - 10)
-            prepared["text"] = trimmed
+            
+            # Ensure text respects Threads max (500 chars)
+            # Keep full text for chunking in _post_to_platform
+            if len(base) > self.post_max_length:
+                logger.warning(f"WARNING: Prepared text ({len(base)} chars) exceeds Threads limit ({self.post_max_length} chars)")
+                logger.info(f"Text will be chunked into multiple posts during posting phase")
+                # Keep full text for chunking in _post_to_platform
+                prepared["text"] = base
+            else:
+                prepared["text"] = base
 
+            prepared["media_selection_strategy"] = context.get("media_selection_strategy", "") if isinstance(context, dict) else ""
             logger.info("Threads content prepared successfully")
             return prepared
         except Exception as e:
@@ -195,17 +201,19 @@ class ThreadsAgent(BasePlatformAgent):
             thread = prepared_content.get("thread", [])
             video_urls = prepared_content.get("videos", [])
             media_source_instructions = prepared_content.get("media_source_instructions", "")
+            media_selection_strategy = prepared_content.get("media_selection_strategy", "")
+            strategy_hint_text = media_selection_strategy or "Use Google Photos Share -> Modify; re-select the same items you picked previously; avoid exploring new flows."
 
             full_text = text
             if hashtags:
                 full_text = f"{full_text}\n\n" + " ".join(hashtags)
             
             # Log the exact text being sent to the agent
-            logger.info(f"🎯 POSTING TEXT TO THREADS ({len(full_text)} chars):")
-            logger.info(f"📝 {full_text}")
+            logger.info(f"POSTING TEXT TO THREADS ({len(full_text)} chars):")
+            logger.info(f"{full_text}")
             
-            # Split text into 400-450 character chunks for threading
-            chunks = self._split_into_chunks(full_text, chunk_size=self.chunk_size)
+            # Split text into chunks with 500 char max, breaking at sentences
+            chunks = self._split_into_chunks(full_text)
             logger.info(f"Split into {len(chunks)} chunks for threading")
             for i, chunk in enumerate(chunks, 1):
                 logger.info(f"  Chunk {i} ({len(chunk)} chars): {chunk[:50]}...")
@@ -216,7 +224,9 @@ class ThreadsAgent(BasePlatformAgent):
             thread_str = json.dumps(thread) if thread else "[]"
 
             # For threading, we need to handle each chunk separately
-            # The agent will post each chunk and reply to it with the next chunk
+            logger.info(f"Prepared {len(chunks)} chunks for posting:")
+            for i, chunk_text in enumerate(chunks, 1):
+                logger.info(f"  Chunk {i}: {len(chunk_text)} chars - {chunk_text[:50]}...")
             
             posted_chunks = 0
             last_post_id = None
@@ -225,11 +235,12 @@ class ThreadsAgent(BasePlatformAgent):
                 chunk_num = chunk_idx + 1
                 total_chunks = len(chunks)
                 
-                # Pass text and thread as variables (not embedded in goal string)
-                # This ensures the agent uses the exact transformed text without reading/reinterpreting
+                # Unified approach: post_chunks array + current index
                 agent_variables = {
-                    "post_text": chunk_text,
-                    "chunk_num": chunk_num,
+                    "post_text": chunk_text,  # Required for get_post_text() tool
+                    "post_chunks": chunks,  # Array of all chunks
+                    "current_chunk_index": chunk_idx,  # 0-indexed
+                    "current_chunk_number": chunk_num,  # 1-indexed
                     "total_chunks": total_chunks,
                     "thread_items": thread,
                     "thread_items_json": thread_str
@@ -240,11 +251,12 @@ class ThreadsAgent(BasePlatformAgent):
                     media_instruction = media_source_instructions.strip()
                     
                     goal = f"""
-                    ⚠️ CRITICAL: FOCUS ONLY ON THREADS - DO NOT OPEN ANY OTHER PLATFORMS
+                    CRITICAL: FOCUS ONLY ON THREADS - DO NOT OPEN ANY OTHER PLATFORMS
                     - You are ONLY posting to Threads right now
                     - DO NOT open Twitter/X, Instagram, LinkedIn, or any other social media apps
                     - Complete this Threads task FULLY before finishing
                     - Return to home screen ONLY after Threads posting is complete
+                    - If a prior media_selection_strategy is provided: {strategy_hint_text}
                     
                     Create a Threads post using media collected FIRST, then add text (Part {chunk_num}/{total_chunks}).
 
@@ -262,52 +274,74 @@ class ThreadsAgent(BasePlatformAgent):
                     - CRITICAL: SCROLL TO THE TOP in Photos tab first to find media from most recent dates
                     - Photos tab shows: Media sorted by month
                     - Collections tab shows: People faces | Albums | Documents | App-wise media
+                                        - If you are NOT in Google Photos yet, you may use the device's app-opening action (e.g., open_app) to LAUNCH GOOGLE PHOTOS ONLY.
+                                            Do NOT use it to open any other app.
 
-                    Media collection (priority):
-                    1) Follow these EXACT instructions to locate/select media on device: {media_instruction}
-                    1a) CRITICAL: If opening Google Photos or any gallery app, SCROLL TO THE TOP first before looking for the media
-                    1b) ⭐ IMPORTANT USEFUL METHOD - TRY THIS FIRST: In Google Photos, select ONE media first, then SCROLL to find more media and tap them to add to selection
-                       * STEP-BY-STEP PROCESS:
-                         1. Select the FIRST media item
-                         2. Verify it's selected (check for selection indicator)
-                         3. SCROLL from the MIDDLE OF THE SCREEN to find the NEXT media item
-                            - Scroll the media grid UPWARDS (swipe from bottom area towards top)
-                            - Start scroll gesture a little UPWARDS from the bottom of visible screen to avoid overlay issues
-                         4. Tap to add it to selection
-                         5. Repeat steps 3-4 for each additional media
-                       * CRITICAL: Always scroll from the middle/center of the screen, NOT from edges
-                       * This is the MOST RELIABLE way to select multiple images
-                       * Don't try to select all at once - do it ONE BY ONE in sequence
-                       * ALWAYS attempt this method BEFORE trying any fallback approaches
-                    1c) MEDIA SELECTION STRATEGY:
-                       - Image ordering in Photos and in-app "Add media" is NOT trustworthy - they may show different orders
-                       - CRITICAL: You CANNOT select media separately and share them one by one to posting apps - must select all together
-                       - CRITICAL: NEVER use Threads' in-app media picker/gallery - it shows media from all sources in wrong order
-                       - ALWAYS use Google Photos via share sheet - this ensures correct media selection
-                                             - If the scroll method above fails, try these alternative approaches:
-                         * Select one image, then swipe up or down, then tap another image to add it to selection
-                         * Try using the collection/album view if direct media browsing fails
-                         * Try selecting from different tabs (Photos tab vs Collections tab)
-                         * If a specific image won't select, try selecting adjacent images first, then deselect and reselect
+                          Media collection (priority):
+                          1) Follow these EXACT instructions to locate/select media on device: {media_instruction}
+                        1a) CRITICAL: If opening Google Photos or any gallery app, SCROLL TO THE TOP first before looking for the media
+                        - If you already selected media successfully earlier in this session, REUSE THAT SAME METHOD (Share → Modify) and re-select the SAME items; do not re-explore new flows
+                          1b) PREFERRED MULTI-PHOTO METHOD (use before scrolling):
+                              - Select the FIRST required photo
+                              - Tap the "Share" button
+                              - In the share sheet, tap "Modify" to add more photos
+                              - In the modify view, select the remaining required photos
+                              - Confirm selection, return to the share sheet, then choose Threads
+                              - This is the primary strategy; use scrolling only if Modify is unavailable
+                          1c) SCROLL-BASED METHOD (fallback):
+                              - Select ONE media first, then SCROLL from the MIDDLE OF THE SCREEN to find the NEXT media item
+                                 * Scroll the media grid UPWARDS (swipe from bottom area towards top)
+                                 * Start scroll gesture a little UPWARDS from the bottom of visible screen to avoid overlay issues
+                              - Tap to add it to selection; repeat for each additional media
+                              - Always scroll from the middle/center of the screen, NOT from edges
+                              - Do it one by one; this is the fallback if Modify is not available
+                          1d) MEDIA SELECTION STRATEGY:
+                              - Image ordering in Photos and in-app "Add media" is NOT trustworthy - they may show different orders
+                              - CRITICAL: You CANNOT select media separately and share them one by one to posting apps - must select all together
+                              - CRITICAL: NEVER use Threads' in-app media picker/gallery - it shows media from all sources in wrong order
+                              - ALWAYS use Google Photos via share sheet - this ensures correct media selection
+                              - If needed: collection/album view; different tabs; adjacent-image select/deselect/reselect
                     2) IMPORTANT: After selecting media, if you cannot find the share button or it's hidden behind a banner/overlay:
                        - Try swiping up slightly to reveal hidden UI elements
                        - Try tapping on empty space to dismiss any overlays
                        - Look for share icons in corners or bottom of screen
                        - If needed, long-press on the media to get context menu with share option
-                    3) Use the system share sheet to share the selected media to Threads (com.instagram.barcelona)
-                       so the Threads composer opens with the media already attached.
+                                                    3) Use the system share sheet to share the selected media to Threads (com.instagram.barcelona)
+                                                            so the Threads composer opens with the media already attached.
+                                                            SELECTION RULES (share sheet):
+                                                            - Choose the PLAIN tile labeled exactly "Threads" (no subtitle under it)
+                                                            - DO NOT select tiles for "Instagram" or any DM/Direct options
+                                                            - If multiple plain "Threads" tiles appear, prefer the one nearest top-left
+                                                            - If an option shows "threads ▾", select it and choose the appropriate composer INSIDE Threads
+                                                            FALLBACK:
+                                                            - If tapping Threads lands on the Threads home feed instead of the composer:
+                                                                * Press BACK twice quickly (within ~1s) to exit to the share sheet
+                                                                * If a toast says "Tap again to exit", press BACK once more immediately
+                                                                * If still in Threads after two back presses: Press HOME, reopen Google Photos via open_app,
+                                                                    re-select media, open share sheet again, and select the plain "Threads" tile
+                                                            - CRITICAL: DO NOT TYPE ANY TEXT UNTIL YOU SEE THE MEDIA THUMBNAILS ATTACHED IN COMPOSER
+                                                            - CRITICAL: If thumbnails are missing, GO BACK and re-share media before typing anything
 
                     Compose and Post in Threads:
-                    4) Call get_post_text() to retrieve the post content ({len(chunk_text)} characters)
-                    5) Store the returned text in a variable: post_content = get_post_text()
-                    6) Type the ENTIRE returned text into the composer using: type(text=post_content, index=...)
-                    7) Look for and tap the "Post" button (usually at top right or bottom)
+                          4) Call get_post_text() to retrieve THIS CHUNK's text (chunk {chunk_num}/{total_chunks}, {len(chunk_text)} chars)
+                          5) Store the returned text: post_content = get_post_text()
+                              - The function will print "POST_TEXT: <actual text>"
+                              - This printed text is what you MUST type
+                          6) Type the ENTIRE returned text into the composer using: type(text=post_content, index=...)
+                              - DO NOT type your own example text
+                              - DO NOT type test strings like "This is a test post..."
+                              - ONLY use the variable post_content that contains the ACTUAL text
+                          7) Look for and tap the "Post" button
                     8) Wait for confirmation that the post was published
                     9) Return success status.
 
-                    CRITICAL: The get_post_text() tool returns the ACTUAL post content for this chunk.
-                    You MUST use that exact text - do NOT generate or summarize your own text.
-                    You MUST publish the post by tapping the Post/Share button - don't leave it as draft.
+                    CRITICAL NOTES:
+                    - get_post_text() returns ONLY THIS CHUNK (chunk {chunk_num} of {total_chunks})
+                    - This is part of a {total_chunks}-post thread
+                    - DO NOT try to access or type other chunks - only THIS chunk
+                    - You MUST use the exact text from get_post_text() - do NOT generate your own
+                                        - NEVER type hardcoded strings - ALWAYS use the variable post_content
+                    - You MUST publish the post - don't leave it as draft
                     
                     After posting:
                     10) Wait for confirmation that the post was published
@@ -321,7 +355,7 @@ class ThreadsAgent(BasePlatformAgent):
                     if chunk_idx == 0:
                         # First chunk without media
                         goal = f"""
-                        ⚠️ CRITICAL: FOCUS ONLY ON THREADS - DO NOT OPEN ANY OTHER PLATFORMS
+                        CRITICAL: FOCUS ONLY ON THREADS - DO NOT OPEN ANY OTHER PLATFORMS
                         - You are ONLY posting to Threads right now
                         - DO NOT open Twitter/X, Instagram, LinkedIn, or any other social media apps
                         - Complete this Threads task FULLY before finishing
@@ -330,16 +364,26 @@ class ThreadsAgent(BasePlatformAgent):
                         Post to Threads (Part {chunk_num}/{total_chunks}):
                         1. Open the Threads app
                         2. Tap the compose icon to create a new post
-                        3. Call get_post_text() to retrieve the post content ({len(chunk_text)} characters)
-                        4. Store the returned text in a variable: post_content = get_post_text()
-                        5. Type the ENTIRE returned text into the composer using: type(text=post_content, index=...)
-                        6. Look for and tap the "Post" button (usually at top right or bottom)
-                        7. Wait for confirmation that the post was published
-                        8. Return success status.
+                        3. If media needs to be attached, do it NOW before typing any text. Confirm thumbnails are visible in the composer.
+                        4. Call get_post_text() to retrieve THIS CHUNK's text (chunk {chunk_num}/{total_chunks}, {len(chunk_text)} chars)
+                        5. Store the returned text in a variable: post_content = get_post_text()
+                           - The function will print "POST_TEXT: <actual text>"
+                           - This printed text is what you MUST type
+                        6. Type the ENTIRE returned text into the composer using: type(text=post_content, index=...)
+                           - DO NOT type your own example text
+                           - DO NOT type test strings like "This is a test post..."
+                           - ONLY use the variable post_content that contains the ACTUAL text
+                           - NEVER type hardcoded strings - ALWAYS use the variable post_content
+                        7. Look for and tap the "Post" button (usually at top right or bottom)
+                        8. Wait for confirmation that the post was published
+                        9. Return success status.
 
-                        CRITICAL: The get_post_text() tool returns the ACTUAL post content for this chunk.
-                        You MUST use that exact text - do NOT generate or summarize your own text.
-                        You MUST publish the post by tapping the Post/Share button - don't leave it as draft.
+                        CRITICAL NOTES:
+                        - get_post_text() returns ONLY THIS CHUNK (chunk {chunk_num} of {total_chunks})
+                        - This is part of a {total_chunks}-post thread
+                        - DO NOT try to access or type other chunks - only THIS chunk
+                        - You MUST use the exact text from get_post_text() - do NOT generate your own
+                        - You MUST publish the post by tapping the Post/Share button - don't leave it as draft
                         
                         After posting:
                         8) Wait for confirmation that the post was published
@@ -351,7 +395,7 @@ class ThreadsAgent(BasePlatformAgent):
                     else:
                         # Reply/continuation chunk
                         goal = f"""
-                        ⚠️ CRITICAL: FOCUS ONLY ON THREADS - DO NOT OPEN ANY OTHER PLATFORMS
+                        CRITICAL: FOCUS ONLY ON THREADS - DO NOT OPEN ANY OTHER PLATFORMS
                         - You are ONLY posting to Threads right now
                         - DO NOT open Twitter/X, Instagram, LinkedIn, or any other social media apps
                         - Complete this Threads task FULLY before finishing
@@ -369,16 +413,26 @@ class ThreadsAgent(BasePlatformAgent):
                                 2. READ the post content to confirm it matches the last chunk you posted
                                     - Only reply if the latest post content matches the current thread context
                                 3. If it matches, look for a "Reply" button on that post and tap it to open the reply composer
-                        3. Call get_post_text() to retrieve the post content for this chunk ({len(chunk_text)} characters)
-                        4. Store the returned text in a variable: post_content = get_post_text()
-                        5. Type the ENTIRE returned text into the reply composer using: type(text=post_content, index=...)
-                        6. Look for and tap the "Post" or "Reply" button
-                        7. Wait for confirmation that the reply was published
-                        8. Return success status.
+                                4. If media needs to be attached to the reply, do it NOW before typing any text. Confirm thumbnails are visible in the composer.
+                                5. Call get_post_text() to retrieve THIS CHUNK's text (chunk {chunk_num}/{total_chunks}, {len(chunk_text)} chars)
+                                6. Store the returned text in a variable: post_content = get_post_text()
+                                    - The function will print "POST_TEXT: <actual text>"
+                                    - This printed text is what you MUST type
+                                7. Type the ENTIRE returned text into the reply composer using: type(text=post_content, index=...)
+                                    - DO NOT type your own example text
+                                    - DO NOT type test strings like "This is a test post..."
+                                    - ONLY use the variable post_content that contains the ACTUAL text
+                                    - NEVER type hardcoded strings - ALWAYS use the variable post_content
+                                8. Look for and tap the "Post" or "Reply" button
+                                9. Wait for confirmation that the reply was published
+                                10. Return success status.
 
-                        CRITICAL: The get_post_text() tool returns the ACTUAL post content for this chunk.
-                        You MUST use that exact text - do NOT generate or summarize your own text.
-                        You MUST publish the reply by tapping the Post/Reply button - don't leave it as draft.
+                        CRITICAL NOTES:
+                        - get_post_text() returns ONLY THIS CHUNK (chunk {chunk_num} of {total_chunks})
+                        - This is a continuation/reply in a {total_chunks}-post thread
+                        - DO NOT try to access or type other chunks - only THIS chunk
+                        - You MUST use the exact text from get_post_text() - do NOT generate your own
+                        - You MUST publish the reply by tapping the Post/Reply button - don't leave it as draft
                         
                         After posting:
                         8) Wait for confirmation that the reply was published

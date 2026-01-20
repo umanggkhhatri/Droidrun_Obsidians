@@ -17,9 +17,9 @@ from werkzeug.utils import secure_filename
 try:
     from dotenv import load_dotenv
     load_dotenv()
-    print("✅ Loaded .env file")
+    print("SUCCESS: Loaded .env file")
 except ImportError:
-    print("⚠️  python-dotenv not installed, using system environment variables")
+    print("WARNING: python-dotenv not installed, using system environment variables")
 
 # Add parent directory to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -51,14 +51,14 @@ def add_no_cache_headers(response):
 # Create upload folder if it doesn't exist
 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 
-# CRITICAL: Load ~/.droidrun/config.yaml - THIS MUST BE USED
-config_path = os.path.expanduser("~/.droidrun/config.yaml")
+# Load project config from config/droidrun_config.yaml
+config_path = os.path.join(Path(__file__).parent.parent, 'config', 'droidrun_config.yaml')
 print(f"\n{'='*60}")
 print(f"CONFIGURATION LOADING")
 print(f"{'='*60}")
 
 if not os.path.exists(config_path):
-    print(f"❌ CRITICAL ERROR: ~/.droidrun/config.yaml NOT FOUND at {config_path}")
+    print(f"ERROR: CRITICAL ERROR: config/droidrun_config.yaml NOT FOUND at {config_path}")
     print(f"   Please create this file first!")
     sys.exit(1)
 
@@ -66,11 +66,11 @@ if not os.path.exists(config_path):
 try:
     with open(config_path, 'r') as f:
         droidrun_config_data = yaml.safe_load(f)
-    print(f"✅ ~/.droidrun/config.yaml loaded successfully")
+    print(f"SUCCESS: config/droidrun_config.yaml loaded successfully")
     print(f"   Location: {config_path}")
     print(f"   LLM Profiles: {list(droidrun_config_data.get('llm_profiles', {}).keys())}")
 except Exception as e:
-    print(f"❌ FAILED to parse ~/.droidrun/config.yaml: {e}")
+    print(f"ERROR: FAILED to parse config/droidrun_config.yaml: {e}")
     sys.exit(1)
 
 # Initialize DroidrunConfig with the loaded YAML data
@@ -80,24 +80,9 @@ try:
     
     # Create DroidrunConfig and pass the loaded configuration
     droidrun_config = DroidrunConfig.from_yaml(config_path)
-    print(f"✅ DroidrunConfig initialized with max_steps: {max_steps}")
+    print(f"SUCCESS: DroidrunConfig initialized with max_steps: {max_steps}")
     print(f"   Agent config: {droidrun_config_data.get('agent', {})}")
-    # Ensure vision is enabled so the agent can analyze screenshots/images
-        # Vision flags enabling code removed to revert vision usage
     
-        # The following lines were removed:
-        # try:
-        #     if hasattr(droidrun_config, 'agent'):
-        #         agent_cfg = getattr(droidrun_config, 'agent')
-        #         if hasattr(agent_cfg, 'codeact') and hasattr(agent_cfg.codeact, 'vision'):
-        #             agent_cfg.codeact.vision = True
-        #         if hasattr(agent_cfg, 'manager') and hasattr(agent_cfg.manager, 'vision'):
-        #             agent_cfg.manager.vision = True
-        #         if hasattr(agent_cfg, 'executor') and hasattr(agent_cfg.executor, 'vision'):
-        #             agent_cfg.executor.vision = True
-        #     print("✅ Vision mode enabled for DroidRun (codeact/manager/executor)")
-        # except Exception as ve:
-        #     print(f"⚠️  Could not enable vision flags programmatically: {ve}")
 except TypeError:
     # If DroidrunConfig doesn't accept kwargs, try creating it normally
     # but set max_steps attribute directly
@@ -107,18 +92,18 @@ except TypeError:
         if hasattr(droidrun_config, 'agent'):
             if hasattr(droidrun_config.agent, 'max_steps'):
                 droidrun_config.agent.max_steps = droidrun_config_data.get('agent', {}).get('max_steps', 15)
-        print(f"✅ DroidrunConfig initialized (fallback method)")
+        print(f"SUCCESS: DroidrunConfig initialized (fallback method)")
     except Exception as e2:
-        print(f"❌ CRITICAL: Failed to initialize DroidrunConfig: {e2}")
+        print(f"ERROR: CRITICAL: Failed to initialize DroidrunConfig: {e2}")
         droidrun_config = None
 except Exception as e:
-    print(f"❌ CRITICAL: Error initializing DroidrunConfig: {e}")
-    print(f"   This means config.yaml is not being used!")
+    print(f"ERROR: CRITICAL: Error initializing DroidrunConfig: {e}")
+    print(f"   This means config/droidrun_config.yaml is not being used!")
     droidrun_config = None
 
 # Load app config
 app_config = get_config()
-print(f"✅ App config loaded: {app_config.__class__.__name__}")
+print(f"SUCCESS: App config loaded: {app_config.__class__.__name__}")
 print(f"   MAX_CRAWL_DEPTH: {app_config.MAX_CRAWL_DEPTH}")
 enabled_platforms = [k for k, v in app_config.PLATFORMS.items() if v.get('enabled')]
 print(f"   Enabled platforms: {enabled_platforms}")
@@ -127,9 +112,9 @@ print(f"   Enabled platforms: {enabled_platforms}")
 google_api_key = os.getenv("GOOGLE_API_KEY") or os.getenv("GEMINI_API_KEY")
 if google_api_key:
     masked = google_api_key[:8] + "..." + google_api_key[-4:] if len(google_api_key) > 12 else "***"
-    print(f"✅ GOOGLE_API_KEY found: {masked}")
+    print(f"SUCCESS: GOOGLE_API_KEY found: {masked}")
 else:
-    print(f"⚠️  GOOGLE_API_KEY not set! Content transformation will fail.")
+    print(f"WARNING: GOOGLE_API_KEY not set! Content transformation will fail.")
     print(f"   Set it with: export GOOGLE_API_KEY='your-api-key-here'")
     print(f"   Or add it to a .env file in the project root.")
 
@@ -230,24 +215,24 @@ def post_content():
         # Parse platforms
         try:
             platforms_raw = json.loads(platforms_json)
-            emit_log(f'📥 RAW platform data received: {platforms_raw} (type: {type(platforms_raw)})', 'info')
+            emit_log(f'RAW platform data received: {platforms_raw} (type: {type(platforms_raw)})', 'info')
             
             # Normalize platform names (lowercase, strip whitespace)
             platforms = [p.lower().strip() for p in platforms_raw if p]
-            emit_log(f'📋 Normalized platforms: {platforms}', 'info')
+            emit_log(f'Normalized platforms: {platforms}', 'info')
         except (json.JSONDecodeError, TypeError) as e:
-            emit_log(f'❌ Error parsing platforms JSON: {e}', 'error')
+            emit_log(f'ERROR: Error parsing platforms JSON: {e}', 'error')
             platforms = []
         
-        # CRITICAL: Validate platform names match expected values
+        # Validate platform names against supported set
         valid_platform_names = {'twitter', 'threads', 'instagram', 'linkedin'}
         invalid_platforms = [p for p in platforms if p not in valid_platform_names]
         if invalid_platforms:
-            emit_log(f'⚠️  Invalid platform names detected: {invalid_platforms}', 'warning')
+            emit_log(f'WARNING: Invalid platform names detected: {invalid_platforms}', 'warning')
             platforms = [p for p in platforms if p in valid_platform_names]
         
-        # CRITICAL: Log final validated platforms
-        emit_log(f'✅ VALIDATED platform selection: {platforms}', 'step')
+        # Log final validated platforms
+        emit_log(f'SUCCESS: VALIDATED platform selection: {platforms}', 'step')
         emit_log(f'   Count: {len(platforms)} platform(s)', 'info')
         
         # Validation: require at least text, media instructions, or links
@@ -263,8 +248,8 @@ def post_content():
                 'message': 'Please select at least one platform'
             }), 400
         
-        # CRITICAL: Log and validate platform selection
-        emit_log(f'✅ Platform selection validated: {platforms}', 'step')
+        # Log and validate platform selection
+        emit_log(f'SUCCESS: Platform selection validated: {platforms}', 'step')
         
         # === STEP 1: CRAWL LINKS FIRST ===
         crawled_content = ""
@@ -274,7 +259,7 @@ def post_content():
         if text:
             urls_in_text = extract_urls_from_text(text)
             all_urls.extend(urls_in_text)
-            emit_log(f'🔍 Found {len(urls_in_text)} URLs in description', 'info')
+            emit_log(f'Found {len(urls_in_text)} URLs in description', 'info')
         
         # Extract URLs from links field
         if links:
@@ -282,26 +267,26 @@ def post_content():
             for line in link_lines:
                 urls_in_line = extract_urls_from_text(line)
                 all_urls.extend(urls_in_line)
-            emit_log(f'🔍 Found {len(link_lines)} links in links field', 'info')
+            emit_log(f'Found {len(link_lines)} links in links field', 'info')
         
         # Remove duplicates
         all_urls = list(set(all_urls))
         
         # Crawl all URLs
         if all_urls:
-            emit_log(f'🔗 Crawling {len(all_urls)} unique URLs...', 'step')
+            emit_log(f'Crawling {len(all_urls)} unique URLs...', 'step')
             
             crawler = LinkCrawler(max_links_per_page=5, timeout=15)
             
             for url in all_urls[:3]:  # Limit to 3 URLs max
                 try:
-                    emit_log(f'📄 Crawling: {url}', 'info')
+                    emit_log(f'Crawling: {url}', 'info')
                     content_from_url = crawler.crawl_url(url)
                     if content_from_url:
                         crawled_content += f"\n\n{content_from_url}"
-                        emit_log(f'✅ Crawled {len(content_from_url)} chars from {url}', 'success')
+                        emit_log(f'SUCCESS: Crawled {len(content_from_url)} chars from {url}', 'success')
                 except Exception as e:
-                    emit_log(f'⚠️ Failed to crawl {url}: {str(e)}', 'error')
+                    emit_log(f'WARNING: Failed to crawl {url}: {str(e)}', 'error')
         
         # === STEP 2: COMBINE DESCRIPTION + CRAWLED CONTENT ===
         combined_content = ""
@@ -311,19 +296,19 @@ def post_content():
         
         if crawled_content:
             combined_content += f"\n\nCRAWLED LINK CONTENT:{crawled_content}"
-            emit_log(f'📋 Combined content: {len(combined_content)} total chars', 'info')
+            emit_log(f'Combined content: {len(combined_content)} total chars', 'info')
         
         # === STEP 3: TRANSFORM COMBINED CONTENT WITH LLM (PLATFORM-SPECIFIC) ===
         if combined_content and len(combined_content) > 10:
             try:
                 # Transform content separately for each platform for better results
-                emit_log(f'📝 Transforming content for {len(platforms)} platforms ({len(combined_content)} chars)...', 'step')
-                emit_log(f'📋 Input preview: {combined_content[:300]}...', 'info')
+                emit_log(f'Transforming content for {len(platforms)} platforms ({len(combined_content)} chars)...', 'step')
+                emit_log(f'Input preview: {combined_content[:300]}...', 'info')
                 
                 # For now, transform once with general platform or first selected platform
                 # TODO: Consider transforming separately per platform in future
                 primary_platform = platforms[0] if platforms else "general"
-                emit_log(f'🎨 Using {primary_platform} tone and style', 'info')
+                emit_log(f'Using {primary_platform} tone and style', 'info')
                 
                 # Run async transformation in thread to avoid event loop issues
                 import concurrent.futures
@@ -335,22 +320,22 @@ def post_content():
                     transformed_text = future.result(timeout=90)  # 90s timeout for larger content with crawling
                 
                 if transformed_text and len(transformed_text) > 20:
-                    emit_log(f'✨ TRANSFORMED TEXT ({len(transformed_text)} chars):', 'success')
-                    emit_log(f'📝 {transformed_text}', 'success')
+                    emit_log(f'SUCCESS: TRANSFORMED TEXT ({len(transformed_text)} chars):', 'success')
+                    emit_log(f'{transformed_text}', 'success')
                     text = transformed_text  # Use transformed text for posting
                 else:
-                    emit_log(f'⚠️  LLM returned empty or too short, using original text', 'info')
+                    emit_log(f'WARNING: LLM returned empty or too short, using original text', 'info')
                     text = text if text else "Check out this content!"
             except Exception as e:
-                emit_log(f'💥 LLM transformation error: {type(e).__name__}: {str(e)}', 'error')
-                emit_log(f'⚠️  Using original text instead', 'info')
+                emit_log(f'ERROR: LLM transformation error: {type(e).__name__}: {str(e)}', 'error')
+                emit_log(f'WARNING: Using original text instead', 'info')
                 # Continue with original text if transformation fails
         elif not text:
             text = "Check out this content!"
-            emit_log(f'⚠️  No text content, using default', 'info')
+            emit_log(f'WARNING: No text content, using default', 'info')
         
         # Log the final text that will be posted
-        emit_log(f'🎯 FINAL POST TEXT ({len(text)} chars): {text}', 'step')
+        emit_log(f'FINAL POST TEXT ({len(text)} chars): {text}', 'step')
         
         # Create content object with media source instructions
         # Note: 'text' variable now contains the LLM-transformed text
@@ -375,56 +360,59 @@ def post_content():
             "urls": content.extracted_urls,
         }
         
+        emit_log(f'Content package prepared for agents:', 'info')
+        emit_log(f'  - Text ({len(text)} chars): {text[:100]}...', 'info')
+        emit_log(f'  - Media instructions: {media_source_instructions[:60] if media_source_instructions else "None"}', 'info')
+        emit_log(f'  - URLs: {len(content.extracted_urls)} collected', 'info')
+        
         # Post to platforms
         if not droidrun_config:
             return jsonify({
                 'success': False,
-                'message': 'Droidrun config not loaded. Ensure ~/.droidrun/config.yaml exists'
+                'message': 'Droidrun config not loaded. Ensure config/droidrun_config.yaml exists'
             }), 500
         
-        # CRITICAL: Create agents_map FIRST, then ONLY initialize agents for SELECTED platforms
-        # This prevents any accidental initialization of non-selected agents
+        # Build agents_map only for selected platforms
         agents_map = {}
         
-        # CRITICAL: ONLY initialize agents for platforms that were selected by the user
-        # Do NOT initialize agents for platforms that weren't selected
+        # Initialize agents only for user-selected platforms
         if 'threads' in platforms:
-            agents_map['threads'] = ThreadsAgent(droidrun_config, timeout=400)
-            emit_log(f'✅ Initialized Threads agent (SELECTED)', 'info')
+            agents_map['threads'] = ThreadsAgent(droidrun_config, timeout=1500)
+            emit_log(f'SUCCESS: Initialized Threads agent (timeout: 1500s)', 'info')
         
         if 'instagram' in platforms:
-            agents_map['instagram'] = InstagramAgent(droidrun_config, timeout=400)
-            emit_log(f'✅ Initialized Instagram agent (SELECTED)', 'info')
+            agents_map['instagram'] = InstagramAgent(droidrun_config, timeout=1500)
+            emit_log(f'SUCCESS: Initialized Instagram agent (timeout: 1500s)', 'info')
         
         if 'twitter' in platforms:
-            agents_map['twitter'] = TwitterAgent(droidrun_config, timeout=400)
-            emit_log(f'✅ Initialized Twitter/X agent (SELECTED)', 'info')
+            agents_map['twitter'] = TwitterAgent(droidrun_config, timeout=1500)
+            emit_log(f'SUCCESS: Initialized Twitter/X agent (timeout: 1500s)', 'info')
         
         if 'linkedin' in platforms:
-            agents_map['linkedin'] = LinkedInAgent(droidrun_config, timeout=400)
-            emit_log(f'✅ Initialized LinkedIn agent (SELECTED)', 'info')
+            agents_map['linkedin'] = LinkedInAgent(droidrun_config, timeout=1500)
+            emit_log(f'SUCCESS: Initialized LinkedIn agent (timeout: 1500s)', 'info')
         
-        # CRITICAL: Final validation - ensure platforms list matches agents_map keys exactly
-        # Remove any platforms that don't have agents initialized
+        # Ensure platforms list matches agents_map keys
+        # Remove any platforms without initialized agents
         platforms = [p for p in platforms if p in agents_map]
         
-        # CRITICAL: Log what we're about to do
-        emit_log(f'🔒 FINAL VERIFICATION:', 'step')
+        # Log planned posting targets
+        emit_log(f'FINAL VERIFICATION:', 'step')
         emit_log(f'   Selected platforms: {platforms}', 'info')
         emit_log(f'   Agents initialized: {list(agents_map.keys())}', 'info')
         emit_log(f'   These MUST match exactly!', 'info')
         
-        # CRITICAL: Double-check we have platforms to post to
+        # Verify there are platforms to post to
         if not platforms:
-            emit_log(f'❌ No valid platforms to post to after filtering', 'error')
+            emit_log(f'ERROR: No valid platforms to post to after filtering', 'error')
             return jsonify({
                 'success': False,
                 'message': f'No valid platforms selected. Available: {list(agents_map.keys())}'
             }), 400
         
-        # CRITICAL: Verify platforms and agents match exactly
+        # Verify platforms and agents match exactly
         if set(platforms) != set(agents_map.keys()):
-            emit_log(f'❌ CRITICAL ERROR: Platform mismatch detected!', 'error')
+            emit_log(f'ERROR: CRITICAL ERROR: Platform mismatch detected!', 'error')
             emit_log(f'   Platforms: {platforms}', 'error')
             emit_log(f'   Agents: {list(agents_map.keys())}', 'error')
             return jsonify({
@@ -432,11 +420,11 @@ def post_content():
                 'message': 'Platform selection mismatch - this should never happen'
             }), 500
         
-        # CRITICAL: Log final platform list that will be posted to - this is the ONLY list we'll use
-        emit_log(f'🎯 FINAL platform list (will post to these ONLY): {platforms}', 'step')
-        emit_log(f'📊 Total platforms to process: {len(platforms)}', 'info')
-        emit_log(f'🔒 PLATFORM SELECTION LOCKED - Will NOT post to any other platforms', 'step')
-        emit_log(f'🚫 Agents NOT initialized for: {[p for p in ["threads", "instagram", "twitter", "linkedin"] if p not in platforms]}', 'info')
+        # Log final platform list used for posting
+        emit_log(f'FINAL platform list (will post to these ONLY): {platforms}', 'step')
+        emit_log(f'Total platforms to process: {len(platforms)}', 'info')
+        emit_log(f'PLATFORM SELECTION LOCKED - Will NOT post to any other platforms', 'step')
+        emit_log(f'Agents NOT initialized for: {[p for p in ["threads", "instagram", "twitter", "linkedin"] if p not in platforms]}', 'info')
         
         # Post to each platform with progress updates
         formatted_results = []
@@ -446,51 +434,54 @@ def post_content():
         set_log_callback(emit_log)
         
         # Step 1: Preparation
-        emit_progress(1, total_steps, '🔄 Preparing content', 'Setting up posting workflow...')
+        emit_progress(1, total_steps, 'Preparing content', 'Setting up posting workflow...')
         emit_log('Starting content preparation...', 'info')
         if media_source_instructions:
-            emit_progress(1, total_steps, '🔄 Preparing content', f'Media Source: {media_source_instructions[:60]}...')
-            emit_log(f'📱 Media instructions: {media_source_instructions}', 'step')
+            emit_progress(1, total_steps, 'Preparing content', f'Media Source: {media_source_instructions[:60]}...')
+            emit_log(f'Media instructions: {media_source_instructions}', 'step')
         
+        media_selection_strategy = None
         current_step = 2
         for platform_idx, platform in enumerate(platforms, 1):
-            # CRITICAL: Triple-check platform is in agents_map and was selected
+            # Ensure platform exists in agents_map and was selected
             if platform not in agents_map:
-                emit_log(f'❌ CRITICAL ERROR: Platform {platform} not in agents_map, ABORTING', 'error')
+                emit_log(f'ERROR: CRITICAL ERROR: Platform {platform} not in agents_map, ABORTING', 'error')
                 emit_log(f'   This should never happen - platform was not selected!', 'error')
                 continue
             
-            # CRITICAL: Verify this platform was in the original selection
+            # Verify platform was in the original selection
             if platform not in platforms:
-                emit_log(f'❌ CRITICAL ERROR: Platform {platform} not in selected platforms, ABORTING', 'error')
+                emit_log(f'ERROR: CRITICAL ERROR: Platform {platform} not in selected platforms, ABORTING', 'error')
                 continue
             
-            # CRITICAL: Sequential processing - wait for previous platform to complete
+            # Sequential processing: wait for previous platform to complete
             if platform_idx > 1:
-                emit_log(f'⏸️  Waiting for previous platform to complete before starting {platform.upper()}...', 'info')
-                emit_log(f'🔄 Sequential mode: Processing platforms ONE BY ONE', 'step')
+                emit_log(f'Waiting for previous platform to complete before starting {platform.upper()}...', 'info')
+                emit_log(f'Sequential mode: Processing platforms ONE BY ONE', 'step')
             
             # Log which platform we're about to post to
-            emit_log(f'🚀 [{platform_idx}/{len(platforms)}] Starting posting to {platform.upper()}', 'step')
-            emit_log(f'✅ Platform {platform.upper()} confirmed as SELECTED - proceeding', 'info')
-            emit_log(f'🔒 CRITICAL: Will NOT open any other platform until {platform.upper()} is COMPLETE', 'step')
+            emit_log(f'[{platform_idx}/{len(platforms)}] Starting posting to {platform.upper()}', 'step')
+            emit_log(f'Platform {platform.upper()} confirmed as SELECTED - proceeding', 'info')
+            emit_log(f'CRITICAL: Will NOT open any other platform until {platform.upper()} is COMPLETE', 'step')
             
             try:
                 # Emit progress for this platform
                 emit_progress(
                     current_step, 
                     total_steps, 
-                    f'📱 Posting to {platform.upper()} ({platform_idx}/{len(platforms)})',
+                    f'Posting to {platform.upper()} ({platform_idx}/{len(platforms)})',
                     f'Processing {platform.upper()} - DO NOT open other platforms until this completes'
                 )
-                emit_log(f'📱 Starting {platform.upper()} agent...', 'step')
-                emit_log(f'⏳ Waiting for {platform.upper()} to complete before moving to next platform...', 'info')
+                emit_log(f'Starting {platform.upper()} agent...', 'step')
+                emit_log(f'Waiting for {platform.upper()} to complete before moving to next platform...', 'info')
                 
                 # Run async posting in thread to avoid event loop issues
-                # CRITICAL: Pass media_source_instructions in context so ThreadsAgent gets it
+                # Pass media_source_instructions in context for agent use
                 context_for_agent = {
                     "media_source_instructions": media_source_instructions
                 }
+                if media_selection_strategy:
+                    context_for_agent["media_selection_strategy"] = media_selection_strategy
                 
                 # Helper function to run agent with log callback in worker thread
                 def run_agent_with_logging():
@@ -502,30 +493,30 @@ def post_content():
                 try:
                     import concurrent.futures
                     import time
-                    # CRITICAL: Sequential execution - wait for this platform to complete before continuing
+                    # Sequential execution: wait for platform to complete
                     with concurrent.futures.ThreadPoolExecutor() as executor:
                         future = executor.submit(run_agent_with_logging)
                         # Wait for completion - this blocks until the platform finishes
-                        result = future.result(timeout=420)  # 7 mins for device automation with media handling
+                        result = future.result(timeout=1520)  # 25.33 mins for device automation with media handling
                     
-                    # CRITICAL: Explicit confirmation that this platform is complete
-                    emit_log(f'✅ {platform.upper()} task COMPLETED', 'success')
-                    emit_log(f'🔄 Ready to proceed to next platform (if any)', 'info')
+                    # Confirm platform task completion
+                    emit_log(f'{platform.upper()} task COMPLETED', 'success')
+                    emit_log(f'Ready to proceed to next platform (if any)', 'info')
                     
                 except concurrent.futures.TimeoutError:
                     result = None
-                    emit_log(f'⏱️  Timeout posting to {platform.upper()} after 420s', 'error')
-                    emit_log(f'⚠️  {platform.upper()} did not complete - moving to next platform', 'warning')
+                    emit_log(f'Timeout posting to {platform.upper()} after 1500s', 'error')
+                    emit_log(f'{platform.upper()} did not complete - moving to next platform', 'warning')
                     raise
                 except Exception as e:
                     result = None
-                    emit_log(f'💥 Exception in {platform.upper()}: {str(e)}', 'error')
-                    emit_log(f'⚠️  {platform.upper()} failed - moving to next platform', 'warning')
+                    emit_log(f'Exception in {platform.upper()}: {str(e)}', 'error')
+                    emit_log(f'{platform.upper()} failed - moving to next platform', 'warning')
                     raise e
                 
                 # Update progress with result
                 if result:
-                    status = '✅' if result.success else '❌'
+                    status = 'SUCCESS' if result.success else 'FAILED'
                     emit_progress(
                         current_step,
                         total_steps,
@@ -533,6 +524,12 @@ def post_content():
                         f'Status: {"Success" if result.success else "Failed"}'
                     )
                     emit_log(f'{status} {platform.upper()}: {result.reason}', 'success' if result.success else 'error')
+
+                    # Capture media selection strategy after the first successful platform (with media available)
+                    if result.success and not media_selection_strategy:
+                        if media_source_instructions or content_dict.get("media") or content_dict.get("videos"):
+                            media_selection_strategy = "photos_share_modify_reuse_same_items"
+                            emit_log('Captured media selection strategy: photos_share_modify_reuse_same_items', 'info')
                     
                     formatted_results.append({
                         'platform': platform,
@@ -541,15 +538,15 @@ def post_content():
                         'error': result.error
                     })
                 
-                # CRITICAL: Add delay between platforms to ensure clean separation
+                # Add delay between platforms for clean separation
                 if platform_idx < len(platforms):
-                    emit_log(f'⏸️  Waiting 3 seconds before starting next platform...', 'info')
+                    emit_log(f'Waiting 3 seconds before starting next platform...', 'info')
                     import time
                     time.sleep(3)
-                    emit_log(f'✅ Ready to start next platform', 'info')
+                    emit_log(f'Ready to start next platform', 'info')
                     
             except Exception as e:
-                emit_log(f'❌ {platform.upper()} failed: {str(e)}', 'error')
+                emit_log(f'{platform.upper()} failed: {str(e)}', 'error')
                 formatted_results.append({
                     'platform': platform,
                     'success': False,
@@ -558,7 +555,7 @@ def post_content():
                 })
                 # Even on error, add delay before next platform
                 if platform_idx < len(platforms):
-                    emit_log(f'⏸️  Waiting 3 seconds before starting next platform...', 'info')
+                    emit_log(f'Waiting 3 seconds before starting next platform...', 'info')
                     import time
                     time.sleep(3)
             finally:
@@ -571,7 +568,7 @@ def post_content():
         emit_progress(
             total_steps,
             total_steps,
-            '🎉 All platforms completed!',
+            'All platforms completed!',
             'Your content has been posted.'
         )
         
